@@ -71,6 +71,8 @@ export interface CharacterData {
   speed: number;
   attacks: Attack[];
   skills: Skill[];
+  skillPointsToInvest: number;
+  maxSkillRank: number;
   money: Money;
   equipment: string;
   feats: string;
@@ -343,6 +345,8 @@ export const DEFAULT_CHARACTER: CharacterData = {
   speed: 30,
   attacks: [],
   skills: DEFAULT_SKILLS,
+  skillPointsToInvest: 0,
+  maxSkillRank: 4,
   money: {
     platinum: 0,
     gold: 0,
