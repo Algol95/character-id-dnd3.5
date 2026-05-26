@@ -33,6 +33,20 @@ interface RollChipProps {
   isSelected: boolean;
 }
 
+function hasCriticalOutcome(result: DiceRollResult | null) {
+  return Boolean(
+    result &&
+    result.diceType > 1 &&
+    (result.isCritical || result.roll === result.diceType),
+  );
+}
+
+function hasFumbleOutcome(result: DiceRollResult | null) {
+  return Boolean(
+    result && result.diceType > 1 && (result.isFumble || result.roll === 1),
+  );
+}
+
 function getResultAppearance(result: DiceRollResult | null): ResultAppearance {
   if (!result) {
     return {
@@ -42,7 +56,7 @@ function getResultAppearance(result: DiceRollResult | null): ResultAppearance {
     };
   }
 
-  if (result.isCritical) {
+  if (hasCriticalOutcome(result)) {
     return {
       diceColorClass: "text-critical animate-critical-glow",
       backdropClass: "bg-critical/20",
@@ -50,7 +64,7 @@ function getResultAppearance(result: DiceRollResult | null): ResultAppearance {
     };
   }
 
-  if (result.isFumble) {
+  if (hasFumbleOutcome(result)) {
     return {
       diceColorClass: "text-fumble animate-fumble-shake",
       backdropClass: "bg-fumble/20",
@@ -163,6 +177,8 @@ export function DiceRollModal({
 
   const appearance = getResultAppearance(result);
   const hasMultipleRolls = (result?.rolls.length ?? 0) > 1;
+  const showOutcomeMessage =
+    hasCriticalOutcome(result) || hasFumbleOutcome(result);
 
   const handleBackdropClick = () => {
     if (canCloseRef.current && !isRolling) {
@@ -227,7 +243,7 @@ export function DiceRollModal({
         )}
 
         {/* Critical/Fumble Message */}
-        {result && (result.isCritical || result.isFumble) && (
+        {result && showOutcomeMessage && (
           <div
             className={`text-2xl md:text-4xl font-bold tracking-widest ${appearance.diceColorClass}`}
           >

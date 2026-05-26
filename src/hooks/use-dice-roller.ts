@@ -9,6 +9,7 @@ export type DiceRollMode = "normal" | "advantage" | "disadvantage";
 
 export interface DiceRollOptions {
   mode?: DiceRollMode;
+  highlightOutcome?: boolean;
 }
 
 export interface DiceRollResult {
@@ -55,6 +56,7 @@ export function useDiceRoller() {
 
       const resolveTimer = window.setTimeout(() => {
         const rollMode = options.mode ?? "normal";
+        const highlightOutcome = options.highlightOutcome ?? true;
         const rolls =
           rollMode === "normal"
             ? [Math.floor(Math.random() * diceType) + 1]
@@ -86,8 +88,8 @@ export function useDiceRoller() {
           selectedRollIndex,
           rollMode,
           modifierBreakdown: modifiers,
-          isCritical: roll === diceType,
-          isFumble: diceType === 20 && roll === 1,
+          isCritical: highlightOutcome && diceType > 1 && roll === diceType,
+          isFumble: highlightOutcome && diceType > 1 && roll === 1,
         });
         setIsRolling(false);
       }, 900);

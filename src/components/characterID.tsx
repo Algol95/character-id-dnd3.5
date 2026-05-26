@@ -270,6 +270,7 @@ export function CharacterId() {
       rollDice(
         1,
         modifiers.map((m, i) => (i === 0 ? { ...m, value: m.value - 1 } : m)),
+        { highlightOutcome: false },
       );
     },
     [rollDice],
