@@ -1,4 +1,5 @@
 import { SectionShell } from "./sectionShell";
+import type { DiceRollMode } from "@/hooks/use-dice-roller";
 
 const DICE_TYPES = [
   { sides: 4, label: "D4", color: "text-blue-400" },
@@ -12,12 +13,17 @@ const DICE_TYPES = [
 
 /**
  * Propiedades del panel de tiradas rapidas de dados.
+ * @param onRoll Funcion a ejecutar al seleccionar una opcion de tirada rapida, recibe el label descriptivo, los modificadores aplicables, el tipo de dado y el modo de tirada.
+ * @param isOpen Indica si el panel de tiradas rapidas esta desplegado o plegado.
+ * @param onToggle Funcion a ejecutar al hacer click en el control de plegado, normalmente para alternar el estado de isOpen.
+ * @returns Un panel con botones para tirar dados rapidos y opciones predefinidas para situaciones comunes como ventaja o desventaja.
  */
 interface DiceRollerProps {
   onRoll: (
     label: string,
     modifiers: { label: string; value: number }[],
     diceType: number,
+    mode?: DiceRollMode,
   ) => void;
   isOpen?: boolean;
   onToggle?: () => void;
@@ -26,6 +32,10 @@ interface DiceRollerProps {
 /**
  * Ofrece un tablero de dados rapidos y accesos directos para ventaja y
  * desventaja durante la partida.
+ * @param onRoll Funcion a ejecutar al seleccionar una opcion de tirada rapida, recibe el label descriptivo, los modificadores aplicables, el tipo de dado y el modo de tirada.
+ * @param isOpen Indica si el panel de tiradas rapidas esta desplegado o plegado.
+ * @param onToggle Funcion a ejecutar al hacer click en el control de plegado, normalmente para alternar el estado de isOpen.
+ * @returns Un panel con botones para tirar dados rapidos y opciones predefinidas para situaciones comunes como ventaja o desventaja.
  */
 export function DiceRoller({ onRoll, isOpen, onToggle }: DiceRollerProps) {
   return (
@@ -49,7 +59,6 @@ export function DiceRoller({ onRoll, isOpen, onToggle }: DiceRollerProps) {
             `}
             title={`Tirar un ${dice.label}`}
           >
-            {/* Dice icon */}
             <div className={`relative ${dice.color}`}>
               <DiceIcon sides={dice.sides} className="w-8 h-8" />
             </div>
@@ -60,7 +69,6 @@ export function DiceRoller({ onRoll, isOpen, onToggle }: DiceRollerProps) {
         ))}
       </div>
 
-      {/* Quick roll with modifier */}
       <div className="mt-4 pt-4 border-t border-border">
         <QuickRollWithModifier onRoll={onRoll} />
       </div>
@@ -70,6 +78,9 @@ export function DiceRoller({ onRoll, isOpen, onToggle }: DiceRollerProps) {
 
 /**
  * Agrupa atajos de tirada comunes para agilizar situaciones frecuentes.
+ * Actualmente incluye opciones para tirar con ventaja o desventaja, pero se pueden expandir con mas modos o combinaciones de modificadores.
+ * @param onRoll Funcion a ejecutar al seleccionar una opcion de tirada rapida, recibe el label descriptivo, los modificadores aplicables, el tipo de dado y el modo de tirada.
+ * @returns Un conjunto de botones para realizar tiradas rapidas con configuraciones predefinidas.
  */
 function QuickRollWithModifier({
   onRoll,
@@ -78,19 +89,24 @@ function QuickRollWithModifier({
     label: string,
     modifiers: { label: string; value: number }[],
     diceType: number,
+    mode?: DiceRollMode,
   ) => void;
 }) {
   return (
     <div className="flex flex-wrap gap-2 items-center justify-center">
       <button
-        onClick={() => onRoll("Ventaja (2d20 elige el mayor)", [], 20)}
+        onClick={() =>
+          onRoll("Ventaja (2d20 elige el mayor)", [], 20, "advantage")
+        }
         className="px-3 py-1.5 text-xs rounded bg-success/20 border border-success/50 
           text-success hover:bg-success/30 transition-colors"
       >
         Ventaja
       </button>
       <button
-        onClick={() => onRoll("Desventaja (2d20 elige el menor)", [], 20)}
+        onClick={() =>
+          onRoll("Desventaja (2d20 elige el menor)", [], 20, "disadvantage")
+        }
         className="px-3 py-1.5 text-xs rounded bg-blood-red/10 border border-blood-red/50 
           text-blood-red hover:bg-blood-red/30 transition-colors"
       >
@@ -103,6 +119,9 @@ function QuickRollWithModifier({
 /**
  * Dibuja la representacion visual de cada tipo de dado usado en el panel de
  * tiradas rapidas.
+ * @param sides Cantidad de caras del dado (4, 6, 8, 10, 12, 20, 100)
+ * @param className Clases adicionales para personalizar el estilo del icono
+ * @returns Un SVG con la forma y numero correspondiente al tipo de dado
  */
 function DiceIcon({
   sides,
@@ -111,7 +130,6 @@ function DiceIcon({
   sides: number;
   className?: string;
 }) {
-  // Different SVG shapes for different dice
   switch (sides) {
     case 4:
       return (

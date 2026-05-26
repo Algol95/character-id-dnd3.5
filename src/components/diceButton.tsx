@@ -1,5 +1,9 @@
 /**
  * Propiedades del boton reutilizable para lanzar dados rapidos.
+ * @property onClick Funcion a ejecutar al hacer click, normalmente para lanzar una tirada.
+ * @property size Tamaño del boton, "sm" para espacios reducidos y "md" para mayor visibilidad.
+ * @property disabled Indica si el boton esta deshabilitado, por ejemplo durante una animacion de tirada.
+ * @returns Un boton estilizado con icono de dado y efectos visuales para interaccion.
  */
 interface DiceButtonProps {
   onClick: () => void;
@@ -10,6 +14,10 @@ interface DiceButtonProps {
 /**
  * Renderiza un boton compacto con icono de dado para lanzar tiradas desde
  * distintas secciones de la interfaz.
+ * @param onClick Funcion a ejecutar al hacer click, normalmente para lanzar una tirada.
+ * @param size Tamaño del boton, "sm" para espacios reducidos y "md" para mayor visibilidad.
+ * @param disabled Indica si el boton esta deshabilitado, por ejemplo durante una animacion de tirada.
+ * @returns Un boton estilizado con icono de dado y efectos visuales para interaccion.
  */
 export function DiceButton({
   onClick,
@@ -30,7 +38,6 @@ export function DiceButton({
       aria-label="Tirar dado"
     >
       <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor">
-        {/* D20 icon */}
         <path d="M12 2L2 9l10 13 10-13L12 2zm0 3.84L18.26 9 12 18.54 5.74 9 12 5.84z" />
       </svg>
     </button>

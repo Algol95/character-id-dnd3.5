@@ -5,7 +5,7 @@ import {
   type ChangeEvent,
   type ReactNode,
 } from "react";
-import { useDiceRoller } from "@/hooks/use-dice-roller";
+import { useDiceRoller, type DiceRollMode } from "@/hooks/use-dice-roller";
 import { DiceRollModal } from "./diceRollModal";
 import { BasicInfo } from "./basicInfo";
 import { AbilityScores } from "./abilityScores";
@@ -209,9 +209,14 @@ export function CharacterId() {
   }, []);
 
   const handleRoll = useCallback(
-    (label: string, modifiers: RollModifier[], diceType: number = 20) => {
+    (
+      label: string,
+      modifiers: RollModifier[],
+      diceType: number = 20,
+      mode: DiceRollMode = "normal",
+    ) => {
       setRollLabel(label);
-      rollDice(diceType, modifiers);
+      rollDice(diceType, modifiers, { mode });
     },
     [rollDice],
   );

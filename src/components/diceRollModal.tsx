@@ -28,6 +28,11 @@ interface ResultAppearance {
   resultMessage: string;
 }
 
+interface RollChipProps {
+  value: number;
+  isSelected: boolean;
+}
+
 function getResultAppearance(result: DiceRollResult | null): ResultAppearance {
   if (!result) {
     return {
@@ -49,7 +54,7 @@ function getResultAppearance(result: DiceRollResult | null): ResultAppearance {
     return {
       diceColorClass: "text-fumble animate-fumble-shake",
       backdropClass: "bg-fumble/20",
-      resultMessage: "PIFIA CRITICA",
+      resultMessage: "PIFIA",
     };
   }
 
@@ -83,6 +88,20 @@ function DiceValue({
     >
       {roll}
     </text>
+  );
+}
+
+function RollChip({ value, isSelected }: RollChipProps) {
+  return (
+    <div
+      className={`min-w-16 rounded-xl border px-3 py-2 text-center transition-colors ${
+        isSelected
+          ? "border-gold bg-gold/15 text-gold shadow-[0_0_18px_rgba(212,175,55,0.18)]"
+          : "border-border/80 bg-background/55 text-muted-foreground"
+      }`}
+    >
+      <div className="mt-1 text-2xl font-bold">{value}</div>
+    </div>
   );
 }
 
@@ -143,6 +162,7 @@ export function DiceRollModal({
   if (typeof document === "undefined" || !showResult) return null;
 
   const appearance = getResultAppearance(result);
+  const hasMultipleRolls = (result?.rolls.length ?? 0) > 1;
 
   const handleBackdropClick = () => {
     if (canCloseRef.current && !isRolling) {
@@ -193,6 +213,18 @@ export function DiceRollModal({
             </div>
           )}
         </div>
+
+        {result && hasMultipleRolls && !isRolling && (
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            {result.rolls.map((rollValue, index) => (
+              <RollChip
+                key={`${rollValue}-${index}`}
+                value={rollValue}
+                isSelected={index === result.selectedRollIndex}
+              />
+            ))}
+          </div>
+        )}
 
         {/* Critical/Fumble Message */}
         {result && (result.isCritical || result.isFumble) && (

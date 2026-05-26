@@ -5,10 +5,19 @@ export interface DiceModifier {
   value: number;
 }
 
+export type DiceRollMode = "normal" | "advantage" | "disadvantage";
+
+export interface DiceRollOptions {
+  mode?: DiceRollMode;
+}
+
 export interface DiceRollResult {
   roll: number;
   total: number;
   diceType: number;
+  rolls: number[];
+  selectedRollIndex: number;
+  rollMode: DiceRollMode;
   modifierBreakdown: DiceModifier[];
   isCritical: boolean;
   isFumble: boolean;
@@ -34,14 +43,36 @@ export function useDiceRoller() {
   }, [isRolling]);
 
   const rollDice = useCallback(
-    (diceType: number, modifiers: DiceModifier[] = []) => {
+    (
+      diceType: number,
+      modifiers: DiceModifier[] = [],
+      options: DiceRollOptions = {},
+    ) => {
       clearTimers();
       setIsRolling(true);
       setShowResult(true);
       setResult(null);
 
       const resolveTimer = window.setTimeout(() => {
-        const roll = Math.floor(Math.random() * diceType) + 1;
+        const rollMode = options.mode ?? "normal";
+        const rolls =
+          rollMode === "normal"
+            ? [Math.floor(Math.random() * diceType) + 1]
+            : [
+                Math.floor(Math.random() * diceType) + 1,
+                Math.floor(Math.random() * diceType) + 1,
+              ];
+        const selectedRollIndex =
+          rollMode === "advantage"
+            ? rolls[0] >= rolls[1]
+              ? 0
+              : 1
+            : rollMode === "disadvantage"
+              ? rolls[0] <= rolls[1]
+                ? 0
+                : 1
+              : 0;
+        const roll = rolls[selectedRollIndex];
         const modifierTotal = modifiers.reduce(
           (sum, modifier) => sum + modifier.value,
           0,
@@ -51,6 +82,9 @@ export function useDiceRoller() {
           roll,
           total: roll + modifierTotal,
           diceType,
+          rolls,
+          selectedRollIndex,
+          rollMode,
           modifierBreakdown: modifiers,
           isCritical: roll === diceType,
           isFumble: diceType === 20 && roll === 1,
