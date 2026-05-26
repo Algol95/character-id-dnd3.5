@@ -1,0 +1,276 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  /* Dark Fantasy D&D Theme - Parchment & Gold */
+  --background: oklch(0.12 0.01 60);
+  --foreground: oklch(0.9 0.02 80);
+  --card: oklch(0.16 0.015 55);
+  --card-foreground: oklch(0.88 0.03 75);
+  --popover: oklch(0.14 0.012 50);
+  --popover-foreground: oklch(0.9 0.02 80);
+  --primary: oklch(0.75 0.15 75);
+  --primary-foreground: oklch(0.12 0.01 60);
+  --secondary: oklch(0.22 0.02 50);
+  --secondary-foreground: oklch(0.85 0.02 70);
+  --muted: oklch(0.2 0.015 55);
+  --muted-foreground: oklch(0.6 0.03 70);
+  --accent: oklch(0.65 0.18 30);
+  --accent-foreground: oklch(0.95 0.01 80);
+  --destructive: oklch(0.5 0.2 25);
+  --destructive-foreground: oklch(0.95 0.01 80);
+  --border: oklch(0.3 0.04 60);
+  --input: oklch(0.18 0.02 55);
+  --ring: oklch(0.7 0.14 75);
+  --chart-1: oklch(0.75 0.15 75);
+  --chart-2: oklch(0.65 0.18 30);
+  --chart-3: oklch(0.5 0.12 200);
+  --chart-4: oklch(0.6 0.15 140);
+  --chart-5: oklch(0.55 0.12 280);
+  --radius: 0.5rem;
+
+  /* Custom D&D Colors */
+  --gold: oklch(0.78 0.16 80);
+  --gold-dim: oklch(0.55 0.12 75);
+  --parchment: oklch(0.85 0.04 85);
+  --parchment-dark: oklch(0.25 0.03 65);
+  --blood-red: oklch(0.45 0.22 25);
+  --success: oklch(0.6 0.18 145);
+  --critical: oklch(0.85 0.25 140); /* Bright emerald green for nat 20 */
+  --fumble: oklch(0.55 0.28 25); /* Deep crimson red for nat 1 */
+}
+
+@theme inline {
+  --font-sans: "Cinzel", serif;
+  --font-mono: "Geist Mono", "Geist Mono Fallback";
+  --font-body: "Crimson Text", serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-gold: var(--gold);
+  --color-gold-dim: var(--gold-dim);
+  --color-parchment: var(--parchment);
+  --color-parchment-dark: var(--parchment-dark);
+  --color-blood-red: var(--blood-red);
+  --color-success: var(--success);
+  --color-critical: var(--critical);
+  --color-fumble: var(--fumble);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* D20 Dice Animation */
+@keyframes dice-roll {
+  0% {
+    transform: rotateX(0deg) rotateY(0deg) rotateZ(0deg);
+  }
+  25% {
+    transform: rotateX(180deg) rotateY(90deg) rotateZ(45deg);
+  }
+  50% {
+    transform: rotateX(360deg) rotateY(180deg) rotateZ(90deg);
+  }
+  75% {
+    transform: rotateX(540deg) rotateY(270deg) rotateZ(135deg);
+  }
+  100% {
+    transform: rotateX(720deg) rotateY(360deg) rotateZ(180deg);
+  }
+}
+
+@keyframes dice-bounce {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-20px) scale(1.1);
+  }
+}
+
+@keyframes glow-pulse {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 10px var(--gold)) drop-shadow(0 0 20px var(--gold));
+  }
+  50% {
+    filter: drop-shadow(0 0 20px var(--gold)) drop-shadow(0 0 40px var(--gold));
+  }
+}
+
+@keyframes modifier-appear {
+  0% {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes result-slam {
+  0% {
+    transform: scale(0) rotate(-180deg);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.3) rotate(10deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+@keyframes critical-glow {
+  0%,
+  100% {
+    text-shadow:
+      0 0 15px var(--critical),
+      0 0 30px var(--critical),
+      0 0 45px var(--critical);
+    filter: drop-shadow(0 0 20px var(--critical));
+  }
+  50% {
+    text-shadow:
+      0 0 25px var(--critical),
+      0 0 50px var(--critical),
+      0 0 75px var(--critical);
+    filter: drop-shadow(0 0 40px var(--critical));
+  }
+}
+
+@keyframes fumble-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  10%,
+  30%,
+  50%,
+  70%,
+  90% {
+    transform: translateX(-8px) rotate(-2deg);
+  }
+  20%,
+  40%,
+  60%,
+  80% {
+    transform: translateX(8px) rotate(2deg);
+  }
+}
+
+@keyframes fumble-glow {
+  0%,
+  100% {
+    text-shadow:
+      0 0 15px var(--fumble),
+      0 0 30px var(--fumble);
+    filter: drop-shadow(0 0 20px var(--fumble));
+  }
+  50% {
+    text-shadow:
+      0 0 25px var(--fumble),
+      0 0 50px var(--fumble);
+    filter: drop-shadow(0 0 40px var(--fumble));
+  }
+}
+
+.animate-dice-roll {
+  animation: dice-roll 1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.animate-dice-bounce {
+  animation: dice-bounce 0.5s ease-in-out;
+}
+
+.animate-glow-pulse {
+  animation: glow-pulse 1.5s ease-in-out infinite;
+}
+
+.animate-modifier-appear {
+  animation: modifier-appear 0.3s ease-out forwards;
+}
+
+.animate-result-slam {
+  animation: result-slam 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.animate-critical-glow {
+  animation: critical-glow 0.5s ease-in-out infinite;
+}
+
+.animate-fumble-shake {
+  animation:
+    fumble-shake 0.6s ease-in-out,
+    fumble-glow 0.5s ease-in-out infinite;
+}
+
+/* Parchment texture effect */
+.parchment-bg {
+  background: linear-gradient(
+    135deg,
+    var(--card) 0%,
+    var(--secondary) 50%,
+    var(--card) 100%
+  );
+  background-size: 400% 400%;
+}
+
+/* Gold border glow */
+.gold-border {
+  border: 1px solid var(--gold-dim);
+  box-shadow:
+    inset 0 0 20px rgba(0, 0, 0, 0.3),
+    0 0 10px var(--gold-dim);
+}
+
+/* Input styling */
+input[type="text"],
+input[type="number"] {
+  background: var(--input);
+  border: 1px solid var(--border);
+  color: var(--foreground);
+}
+
+input[type="text"]:focus,
+input[type="number"]:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px var(--gold-dim);
+  outline: none;
+}
