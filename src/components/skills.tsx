@@ -168,101 +168,135 @@ export function Skills({
         </div>
       </div>
 
-      <div className="grid grid-cols-[auto_1fr_auto_auto_auto_auto_auto] gap-1 text-xs text-muted-foreground mb-2 px-1">
-        <div></div>
-        <div>Nombre</div>
-        <div className="text-center w-10">Clave</div>
-        <div className="text-center w-12">Total</div>
-        <div className="text-center w-10">Rangos</div>
-        <div className="text-center w-10">Varios</div>
-        <div className="text-center w-8">Clase</div>
+      <div className="max-h-125 overflow-y-auto pr-1">
+        <div className="gold-border parchment-bg sticky top-0 z-10 mb-3 grid grid-cols-[1.75rem_minmax(0,1fr)_3.5rem_3.25rem_3.5rem_3.5rem_2.75rem] items-center gap-2 rounded-xl px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-gold/70 shadow-[0_10px_16px_rgba(12,8,4,0.16)]">
+          <div></div>
+          <div className="whitespace-nowrap">Nombre</div>
+          <div className="text-center whitespace-nowrap">Clave</div>
+          <div className="text-center whitespace-nowrap">Total</div>
+          <div className="text-center whitespace-nowrap">Rangos</div>
+          <div className="text-center whitespace-nowrap">Varios</div>
+          <div className="text-center whitespace-nowrap">Clase</div>
+        </div>
+
+        <div className="space-y-1">
+          {character.skills.map((skill, index) => {
+            const abilityKey = ABILITY_KEYS[skill.ability];
+            const abilityMod = getAbilityModifier(
+              character[abilityKey] as number,
+            );
+            const total = skill.ranks + abilityMod + skill.miscMod;
+            const isUsableUntrained = UNTRAINED_SKILL_NAMES.has(skill.name);
+            const pointCost = getSkillPointCost(skill.classSkill);
+            const maxAllowedRanks = Math.min(
+              character.maxSkillRank,
+              skill.ranks + Math.floor(remainingSkillPoints / pointCost),
+            );
+
+            const modifiers = [
+              { label: skill.ability, value: abilityMod },
+              ...(skill.ranks > 0
+                ? [{ label: "Rangos", value: skill.ranks }]
+                : []),
+              ...(skill.miscMod !== 0
+                ? [{ label: "Varios", value: skill.miscMod }]
+                : []),
+            ];
+
+            return (
+              <div
+                key={skill.name}
+                className="grid grid-cols-[1.75rem_minmax(0,1fr)_3.5rem_3.25rem_3.5rem_3.5rem_2.75rem] items-center gap-2 rounded px-1 py-1 transition-colors group hover:bg-secondary/30"
+              >
+                <DiceButton
+                  onClick={() => onRollSkill(skill.name, modifiers)}
+                />
+
+                <div className="flex min-w-0 items-center gap-2">
+                  {isUsableUntrained ? (
+                    <span
+                      className="h-2 w-2 shrink-0 rounded-full bg-gold shadow-[0_0_10px_rgba(212,175,55,0.45)]"
+                      title="Se puede usar sin entrenamiento"
+                      aria-label="Se puede usar sin entrenamiento"
+                    />
+                  ) : null}
+                  <span className="text-sm truncate" title={skill.name}>
+                    {skill.name}
+                  </span>
+                </div>
+
+                <span className="text-xs text-center w-10 text-muted-foreground">
+                  {skill.ability}
+                </span>
+
+                <span className="text-center w-12 font-bold text-gold">
+                  {formatModifier(total)}
+                </span>
+
+                <input
+                  type="number"
+                  value={skill.ranks}
+                  onChange={(e) => updateSkillRanks(index, e.target.value)}
+                  className="w-10 text-center text-sm rounded bg-input border border-border py-0.5"
+                  min={0}
+                  max={maxAllowedRanks}
+                  title={`Cada rango cuesta ${pointCost} punto${pointCost > 1 ? "s" : ""}`}
+                />
+
+                <input
+                  type="number"
+                  value={skill.miscMod}
+                  onChange={(e) =>
+                    updateSkill(index, {
+                      miscMod: parseInt(e.target.value) || 0,
+                    })
+                  }
+                  className="w-10 text-center text-sm rounded bg-input border border-border py-0.5"
+                />
+
+                <div className="flex justify-center w-8">
+                  <label className="relative inline-flex cursor-pointer items-center justify-center">
+                    <input
+                      type="checkbox"
+                      checked={skill.classSkill}
+                      onChange={(e) =>
+                        updateSkill(index, { classSkill: e.target.checked })
+                      }
+                      className="peer sr-only"
+                      aria-label={`Marcar ${skill.name} como habilidad de clase`}
+                    />
+                    <span className="flex h-5 w-5 items-center justify-center rounded-md border border-border/80 bg-input/90 text-transparent shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition-all duration-200 peer-checked:border-gold/60 peer-checked:bg-gold/15 peer-checked:text-gold peer-checked:shadow-[0_0_12px_rgba(212,175,55,0.18)] peer-focus-visible:ring-2 peer-focus-visible:ring-gold/60 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-background group-hover:border-gold/30">
+                      <svg
+                        viewBox="0 0 16 16"
+                        aria-hidden="true"
+                        className="h-3.5 w-3.5"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.2"
+                      >
+                        <path
+                          d="M3.5 8.5 6.5 11.5 12.5 4.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </span>
+                  </label>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
-      <div className="space-y-1 max-h-125 overflow-y-auto pr-1">
-        {character.skills.map((skill, index) => {
-          const abilityKey = ABILITY_KEYS[skill.ability];
-          const abilityMod = getAbilityModifier(
-            character[abilityKey] as number,
-          );
-          const total = skill.ranks + abilityMod + skill.miscMod;
-          const isUsableUntrained = UNTRAINED_SKILL_NAMES.has(skill.name);
-          const pointCost = getSkillPointCost(skill.classSkill);
-          const maxAllowedRanks = Math.min(
-            character.maxSkillRank,
-            skill.ranks + Math.floor(remainingSkillPoints / pointCost),
-          );
-
-          const modifiers = [
-            { label: skill.ability, value: abilityMod },
-            ...(skill.ranks > 0
-              ? [{ label: "Rangos", value: skill.ranks }]
-              : []),
-            ...(skill.miscMod !== 0
-              ? [{ label: "Varios", value: skill.miscMod }]
-              : []),
-          ];
-
-          return (
-            <div
-              key={skill.name}
-              className="grid grid-cols-[auto_1fr_auto_auto_auto_auto_auto] gap-1 items-center 
-                py-1 px-1 rounded hover:bg-secondary/30 transition-colors group"
-            >
-              <DiceButton onClick={() => onRollSkill(skill.name, modifiers)} />
-
-              <div className="flex min-w-0 items-center gap-2">
-                {isUsableUntrained ? (
-                  <span
-                    className="h-2 w-2 shrink-0 rounded-full bg-gold shadow-[0_0_10px_rgba(212,175,55,0.45)]"
-                    title="Se puede usar sin entrenamiento"
-                    aria-label="Se puede usar sin entrenamiento"
-                  />
-                ) : null}
-                <span className="text-sm truncate" title={skill.name}>
-                  {skill.name}
-                </span>
-              </div>
-
-              <span className="text-xs text-center w-10 text-muted-foreground">
-                {skill.ability}
-              </span>
-
-              <span className="text-center w-12 font-bold text-gold">
-                {formatModifier(total)}
-              </span>
-
-              <input
-                type="number"
-                value={skill.ranks}
-                onChange={(e) => updateSkillRanks(index, e.target.value)}
-                className="w-10 text-center text-sm rounded bg-input border border-border py-0.5"
-                min={0}
-                max={maxAllowedRanks}
-                title={`Cada rango cuesta ${pointCost} punto${pointCost > 1 ? "s" : ""}`}
-              />
-
-              <input
-                type="number"
-                value={skill.miscMod}
-                onChange={(e) =>
-                  updateSkill(index, { miscMod: parseInt(e.target.value) || 0 })
-                }
-                className="w-10 text-center text-sm rounded bg-input border border-border py-0.5"
-              />
-
-              <div className="flex justify-center w-8">
-                <input
-                  type="checkbox"
-                  checked={skill.classSkill}
-                  onChange={(e) =>
-                    updateSkill(index, { classSkill: e.target.checked })
-                  }
-                  className="w-4 h-4 rounded border-border bg-input accent-gold cursor-pointer"
-                />
-              </div>
-            </div>
-          );
-        })}
+      <div className="mt-4 border-t border-border/70 pt-3">
+        <span className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+          <span
+            className="h-2 w-2 shrink-0 rounded-full bg-gold shadow-[0_0_10px_rgba(212,175,55,0.45)]"
+            aria-hidden="true"
+          />
+          Las habilidades con este símbolo pueden usarlas todos los personajes.
+        </span>
       </div>
     </SectionShell>
   );
