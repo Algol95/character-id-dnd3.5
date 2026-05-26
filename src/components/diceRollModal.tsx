@@ -4,7 +4,16 @@ import type { DiceRollResult } from "@/hooks/use-dice-roller";
 
 const CLOSE_DELAY_MS = 300;
 const DICE_GLOW_STYLE = { filter: "drop-shadow(0 0 20px currentColor)" };
-const DICE_TEXT_STYLE = { fontFamily: "Cinzel, serif" };
+const DICE_TEXT_STYLE = {
+  fontFamily: "Cinzel, serif",
+  fontWeight: 700,
+  letterSpacing: "0.02em",
+  paintOrder: "stroke fill",
+  stroke: "rgba(12, 8, 4, 0.92)",
+  strokeWidth: "2.75px",
+  strokeLinejoin: "round",
+  filter: "drop-shadow(0 2px 10px rgba(0, 0, 0, 0.45))",
+} as const;
 
 interface DiceShapeProps {
   diceType: number;
@@ -19,6 +28,7 @@ interface DiceValueProps {
   x: string;
   y: string;
   className: string;
+  fontSize: number;
   dominantBaseline?: "middle" | "auto";
 }
 
@@ -85,6 +95,7 @@ function DiceValue({
   x,
   y,
   className,
+  fontSize,
   dominantBaseline,
 }: DiceValueProps) {
   if (isRolling || !roll) {
@@ -98,7 +109,7 @@ function DiceValue({
       textAnchor="middle"
       dominantBaseline={dominantBaseline}
       className={className}
-      style={DICE_TEXT_STYLE}
+      style={{ ...DICE_TEXT_STYLE, fontSize: `${fontSize}px` }}
     >
       {roll}
     </text>
@@ -121,6 +132,12 @@ function RollChip({ value, isSelected }: RollChipProps) {
 
 /**
  * Propiedades del modal que presenta el resultado de una tirada.
+ * @param isRolling Indica si la animacion de tirada esta en curso.
+ * @param result Resultado de la tirada, incluyendo el valor del dado, modificadores y total.
+ * @param showResult Controla la visibilidad del modal.
+ * @param onClose Funcion a ejecutar al cerrar el modal.
+ * @param rollLabel Etiqueta descriptiva de la tirada realizada (ej. "Tirada de ataque", "Salvacion de Fortaleza", etc.)
+ * @return Una ventana modal que muestra la animacion de tirada, el resultado del dado, modificadores aplicados y un mensaje especial en caso de critico o pifia. Se monta sobre el documento para garantizar su visibilidad por encima de otros elementos.
  */
 interface DiceRollModalProps {
   isRolling: boolean;
@@ -133,6 +150,12 @@ interface DiceRollModalProps {
 /**
  * Muestra la animacion de tirada y el desglose final del resultado en una
  * ventana modal montada sobre el documento.
+ * @param isRolling Indica si la animacion de tirada esta en curso.
+ * @param result Resultado de la tirada, incluyendo el valor del dado, modificadores y total.
+ * @param showResult Controla la visibilidad del modal.
+ * @param onClose Funcion a ejecutar al cerrar el modal.
+ * @param rollLabel Etiqueta descriptiva de la tirada realizada (ej. "Tirada de ataque", "Salvacion de Fortaleza", etc.)
+ * @return Una ventana modal que muestra la animacion de tirada, el resultado del dado, modificadores aplicados y un mensaje especial en caso de critico o pifia. Se monta sobre el documento para garantizar su visibilidad por encima de otros elementos.
  */
 export function DiceRollModal({
   isRolling,
@@ -191,26 +214,21 @@ export function DiceRollModal({
       className="fixed inset-0 z-50 flex items-center justify-center"
       onClick={handleBackdropClick}
     >
-      {/* Backdrop */}
       <div
         className={`absolute inset-0 ${appearance.backdropClass} backdrop-blur-sm transition-colors duration-500`}
       />
 
-      {/* Modal Content */}
       <div
         className="relative z-10 flex flex-col items-center gap-6 p-8"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Roll Label */}
         <div className="text-center">
           <h2 className="text-2xl md:text-3xl font-bold text-gold tracking-wider uppercase">
             {rollLabel}
           </h2>
         </div>
 
-        {/* Dice Container */}
         <div className="relative w-40 h-40 md:w-52 md:h-52 flex items-center justify-center">
-          {/* Animated Dice */}
           <div className={`relative ${isRolling ? "animate-dice-roll" : ""}`}>
             <DiceShape
               diceType={result?.diceType || 20}
@@ -220,11 +238,10 @@ export function DiceRollModal({
             />
           </div>
 
-          {/* Rolling text */}
           {isRolling && (
             <div className="absolute inset-0 flex items-center justify-center">
               <span className="text-gold text-lg animate-pulse">
-                Tirando...
+                Lanzando...
               </span>
             </div>
           )}
@@ -242,7 +259,6 @@ export function DiceRollModal({
           </div>
         )}
 
-        {/* Critical/Fumble Message */}
         {result && showOutcomeMessage && (
           <div
             className={`text-2xl md:text-4xl font-bold tracking-widest ${appearance.diceColorClass}`}
@@ -251,10 +267,8 @@ export function DiceRollModal({
           </div>
         )}
 
-        {/* Result Breakdown */}
         {result && !isRolling && (
           <div className="flex flex-col items-center gap-4 animate-result-slam">
-            {/* Modifier Breakdown */}
             <div className="flex flex-wrap items-center justify-center gap-2 text-lg md:text-xl">
               <span className={`font-bold ${appearance.diceColorClass}`}>
                 {result.roll}
@@ -280,7 +294,6 @@ export function DiceRollModal({
               ))}
             </div>
 
-            {/* Total */}
             <div className="flex items-center gap-3">
               <span className="text-muted-foreground text-xl">=</span>
               <span
@@ -292,7 +305,6 @@ export function DiceRollModal({
           </div>
         )}
 
-        {/* Close instruction */}
         {result && !isRolling && (
           <p className="text-muted-foreground text-sm mt-4">
             Haz clic en cualquier parte o pulsa ESC para cerrar
@@ -307,6 +319,11 @@ export function DiceRollModal({
 /**
  * Genera la silueta del dado correspondiente al tipo de tirada mostrado en
  * el modal.
+ * @param diceType El tipo de dado a mostrar (4, 6, 8, 10, 12, 20, 100).
+ * @param roll El valor del dado a mostrar en el centro de la figura, se oculta durante la animacion de tirada.
+ * @param isRolling Controla si se muestra la animacion de tirada o el resultado final.
+ * @param colorClass Clase de color para aplicar al dado, se determina segun el resultado (critico, pifia o normal).
+ * @return Un SVG con la forma del dado correspondiente al tipo de tirada, con un estilo de brillo que cambia segun el resultado. Durante la animacion se muestra un efecto de movimiento y el valor del dado se oculta hasta que termina la animacion.
  */
 function DiceShape({ diceType, roll, isRolling, colorClass }: DiceShapeProps) {
   const baseClass = `w-32 h-32 md:w-44 md:h-44 ${isRolling ? "animate-glow-pulse" : ""} ${colorClass}`;
@@ -353,7 +370,8 @@ function DiceShape({ diceType, roll, isRolling, colorClass }: DiceShapeProps) {
           isRolling={isRolling}
           x="50"
           y="65"
-          className="text-3xl font-bold fill-current"
+          fontSize={26}
+          className="fill-current"
         />
       </svg>
     );
@@ -389,7 +407,8 @@ function DiceShape({ diceType, roll, isRolling, colorClass }: DiceShapeProps) {
           isRolling={isRolling}
           x="50"
           y="55"
-          className="text-3xl font-bold fill-current"
+          fontSize={28}
+          className="fill-current"
         />
       </svg>
     );
@@ -428,7 +447,8 @@ function DiceShape({ diceType, roll, isRolling, colorClass }: DiceShapeProps) {
           isRolling={isRolling}
           x="50"
           y="55"
-          className="text-3xl font-bold fill-current"
+          fontSize={28}
+          className="fill-current"
         />
       </svg>
     );
@@ -485,7 +505,8 @@ function DiceShape({ diceType, roll, isRolling, colorClass }: DiceShapeProps) {
           isRolling={isRolling}
           x="50"
           y="55"
-          className="text-3xl font-bold fill-current"
+          fontSize={28}
+          className="fill-current"
         />
       </svg>
     );
@@ -513,7 +534,8 @@ function DiceShape({ diceType, roll, isRolling, colorClass }: DiceShapeProps) {
           isRolling={isRolling}
           x="50"
           y="58"
-          className="text-3xl font-bold fill-current"
+          fontSize={26}
+          className="fill-current"
         />
       </svg>
     );
@@ -545,7 +567,8 @@ function DiceShape({ diceType, roll, isRolling, colorClass }: DiceShapeProps) {
           isRolling={isRolling}
           x="50"
           y="55"
-          className="text-2xl font-bold fill-current"
+          fontSize={22}
+          className="fill-current"
         />
       </svg>
     );
@@ -600,8 +623,9 @@ function DiceShape({ diceType, roll, isRolling, colorClass }: DiceShapeProps) {
         isRolling={isRolling}
         x="50"
         y="55"
+        fontSize={26}
         dominantBaseline="middle"
-        className="text-3xl font-bold fill-current"
+        className="fill-current"
       />
     </svg>
   );
