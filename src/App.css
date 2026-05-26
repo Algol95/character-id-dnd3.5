@@ -1,5 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700;800;900&family=Crimson+Text:wght@400;600;700&display=swap");
 @import "tailwindcss";
-@import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -88,8 +88,67 @@
   * {
     @apply border-border outline-ring/50;
   }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-body);
+    min-height: 100vh;
+    background-image:
+      radial-gradient(circle at top, rgba(212, 175, 55, 0.14), transparent 34%),
+      radial-gradient(
+        circle at 85% 18%,
+        rgba(133, 64, 39, 0.18),
+        transparent 22%
+      ),
+      linear-gradient(
+        180deg,
+        rgba(24, 16, 10, 0.96) 0%,
+        rgba(16, 12, 10, 0.98) 100%
+      );
+    background-attachment: fixed;
+    letter-spacing: 0.01em;
+  }
+
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.15;
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+    background-size: 72px 72px;
+    mask-image: radial-gradient(circle at center, black, transparent 88%);
+  }
+
+  #root {
+    position: relative;
+    min-height: 100vh;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-sans);
+  }
+
+  button,
+  label,
+  select {
+    font-family: var(--font-sans);
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--gold) 52%, transparent);
+    color: #140e08;
   }
 }
 
@@ -243,34 +302,135 @@
 
 /* Parchment texture effect */
 .parchment-bg {
-  background: linear-gradient(
-    135deg,
-    var(--card) 0%,
-    var(--secondary) 50%,
-    var(--card) 100%
-  );
-  background-size: 400% 400%;
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(
+      145deg,
+      rgba(41, 32, 23, 0.95) 0%,
+      rgba(30, 24, 18, 0.94) 52%,
+      rgba(24, 18, 14, 0.96) 100%
+    ),
+    radial-gradient(
+      circle at top right,
+      rgba(212, 175, 55, 0.09),
+      transparent 36%
+    );
+  backdrop-filter: blur(10px);
+}
+
+.parchment-bg::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.1;
+  background-image:
+    linear-gradient(
+      120deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.18) 45%,
+      transparent 100%
+    ),
+    radial-gradient(
+      circle at 20% 10%,
+      rgba(212, 175, 55, 0.22),
+      transparent 25%
+    );
 }
 
 /* Gold border glow */
 .gold-border {
-  border: 1px solid var(--gold-dim);
+  border: 1px solid color-mix(in oklab, var(--gold-dim) 72%, var(--border));
   box-shadow:
-    inset 0 0 20px rgba(0, 0, 0, 0.3),
-    0 0 10px var(--gold-dim);
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.22),
+    0 16px 35px rgba(0, 0, 0, 0.28),
+    0 0 0 1px rgba(212, 175, 55, 0.08);
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.gold-border:hover {
+  border-color: color-mix(in oklab, var(--gold) 72%, var(--border));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.22),
+    0 18px 42px rgba(0, 0, 0, 0.34),
+    0 0 0 1px rgba(212, 175, 55, 0.14);
 }
 
 /* Input styling */
 input[type="text"],
-input[type="number"] {
-  background: var(--input);
-  border: 1px solid var(--border);
+input[type="number"],
+textarea,
+select {
+  background: linear-gradient(
+    180deg,
+    rgba(32, 27, 22, 0.94) 0%,
+    rgba(23, 19, 15, 0.98) 100%
+  );
+  border: 1px solid
+    color-mix(in oklab, var(--border) 88%, rgba(255, 255, 255, 0.03));
   color: var(--foreground);
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    background-color 180ms ease,
+    transform 180ms ease;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    0 8px 18px rgba(0, 0, 0, 0.16);
+}
+
+textarea {
+  resize: vertical;
+  min-height: 7rem;
+}
+
+input[type="text"]::placeholder,
+input[type="number"]::placeholder,
+textarea::placeholder {
+  color: color-mix(in oklab, var(--muted-foreground) 82%, transparent);
 }
 
 input[type="text"]:focus,
-input[type="number"]:focus {
+input[type="number"]:focus,
+textarea:focus,
+select:focus {
   border-color: var(--gold);
-  box-shadow: 0 0 0 2px var(--gold-dim);
+  box-shadow:
+    0 0 0 3px color-mix(in oklab, var(--gold-dim) 55%, transparent),
+    0 14px 28px rgba(0, 0, 0, 0.22);
   outline: none;
+  transform: translateY(-1px);
+}
+
+::-webkit-scrollbar {
+  width: 11px;
+  height: 11px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(18, 14, 10, 0.65);
+}
+
+::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  border: 2px solid rgba(18, 14, 10, 0.65);
+  background: linear-gradient(
+    180deg,
+    rgba(212, 175, 55, 0.8),
+    rgba(123, 89, 32, 0.8)
+  );
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(
+    180deg,
+    rgba(226, 192, 76, 0.95),
+    rgba(144, 104, 36, 0.95)
+  );
 }
