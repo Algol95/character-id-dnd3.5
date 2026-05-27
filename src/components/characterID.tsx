@@ -2,6 +2,7 @@ import {
   useState,
   useEffect,
   useCallback,
+  useMemo,
   type ChangeEvent,
   type ReactNode,
 } from "react";
@@ -10,15 +11,16 @@ import { DiceRollModal } from "./diceRollModal";
 import { BasicInfo } from "./basicInfo";
 import { AbilityScores } from "./abilityScores";
 import { SavingThrows } from "./savingThrows";
-import { Combat } from "./combat";
 import { Attacks } from "./attacks";
 import { Skills } from "./skills";
+import { EquippedGear } from "./equippedGear";
 import { Equipment } from "./equipment";
 import { Feats } from "./feats";
 import { DiceRoller } from "./diceRoller";
 import { Header } from "./header";
 import { Footer } from "./footer";
 import { DEFAULT_CHARACTER, type CharacterData } from "@/lib/character-types";
+import { computeEquipmentBonuses } from "@/lib/equipment-effects";
 
 const STORAGE_KEY = "dnd35-character-sheet";
 const SECTION_VISIBILITY_KEY = "dnd35-section-visibility";
@@ -30,8 +32,8 @@ type SectionKey =
   | "basicInfo"
   | "abilities"
   | "saves"
-  | "combat"
   | "attacks"
+  | "equippedGear"
   | "equipment"
   | "dice"
   | "skills"
@@ -41,8 +43,8 @@ const DEFAULT_SECTION_VISIBILITY: Record<SectionKey, boolean> = {
   basicInfo: true,
   abilities: true,
   saves: true,
-  combat: true,
   attacks: true,
+  equippedGear: true,
   equipment: true,
   dice: true,
   skills: true,
@@ -172,6 +174,10 @@ export function CharacterId() {
 
   const { isRolling, result, showResult, rollDice, closeResult } =
     useDiceRoller();
+  const equipmentBonuses = useMemo(
+    () => computeEquipmentBonuses(character),
+    [character],
+  );
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -347,27 +353,21 @@ export function CharacterId() {
 
                 <AbilityScores
                   character={character}
+                  equipmentBonuses={equipmentBonuses}
                   onChange={handleChange}
                   onRollAbility={handleAbilityRoll}
+                  onRollInitiative={handleInitiativeRoll}
                   isOpen={visibleSections.abilities}
                   onToggle={() => toggleSection("abilities")}
                 />
 
                 <SavingThrows
                   character={character}
+                  equipmentBonuses={equipmentBonuses}
                   onChange={handleChange}
                   onRollSave={handleNamedRoll}
                   isOpen={visibleSections.saves}
                   onToggle={() => toggleSection("saves")}
-                />
-
-                <Combat
-                  character={character}
-                  onChange={handleChange}
-                  onRollInitiative={handleInitiativeRoll}
-                  onRollAttack={handleNamedRoll}
-                  isOpen={visibleSections.combat}
-                  onToggle={() => toggleSection("combat")}
                 />
 
                 <Attacks
@@ -377,6 +377,13 @@ export function CharacterId() {
                   onRollDamage={handleDamageRoll}
                   isOpen={visibleSections.attacks}
                   onToggle={() => toggleSection("attacks")}
+                />
+
+                <EquippedGear
+                  character={character}
+                  onChange={handleChange}
+                  isOpen={visibleSections.equippedGear}
+                  onToggle={() => toggleSection("equippedGear")}
                 />
 
                 <Equipment
@@ -401,6 +408,7 @@ export function CharacterId() {
 
                 <Skills
                   character={character}
+                  equipmentBonuses={equipmentBonuses}
                   onChange={handleChange}
                   onRollSkill={handleNamedRoll}
                   isOpen={visibleSections.skills}

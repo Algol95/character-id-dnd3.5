@@ -1,9 +1,11 @@
+import { FormNumberInput } from "@/components/formNumberInput";
 import { SectionShell } from "./sectionShell";
 import {
   formatModifier,
   getAbilityModifier,
   type CharacterData,
 } from "@/lib/character-types";
+import type { EquipmentBonuses } from "@/lib/equipment-effects";
 
 /**
  * Dibuja un icono de dado simple para controles de combate auxiliares.
@@ -45,6 +47,7 @@ function DiceRollButton({ onClick }: { onClick: () => void }) {
  */
 interface CombatProps {
   character: CharacterData;
+  equipmentBonuses: EquipmentBonuses;
   onChange: (updates: Partial<CharacterData>) => void;
   onRollInitiative: (modifiers: { label: string; value: number }[]) => void;
   onRollAttack: (
@@ -61,15 +64,25 @@ interface CombatProps {
  */
 export function Combat({
   character,
+  equipmentBonuses,
   onChange,
   onRollInitiative,
   onRollAttack,
   isOpen,
   onToggle,
 }: CombatProps) {
-  const dexMod = getAbilityModifier(character.dexterity);
-  const strMod = getAbilityModifier(character.strength);
-  const initiativeTotal = dexMod + character.initiative;
+  const dexMod = getAbilityModifier(
+    character.dexterity + equipmentBonuses.abilityBonuses.dexterity,
+  );
+  const strMod = getAbilityModifier(
+    character.strength + equipmentBonuses.abilityBonuses.strength,
+  );
+  const initiativeTotal =
+    dexMod + character.initiative + equipmentBonuses.initiative;
+  const armorClassTotal = character.armorClass + equipmentBonuses.armorClass;
+  const touchACTotal = character.touchAC + equipmentBonuses.touchAC;
+  const flatFootedACTotal =
+    character.flatFootedAC + equipmentBonuses.flatFootedAC;
 
   return (
     <SectionShell title="COMBATE" isOpen={isOpen} onToggle={onToggle}>
@@ -83,38 +96,44 @@ export function Combat({
             </div>
             <div className="flex items-center justify-center gap-2">
               <div className="text-center">
-                <input
-                  type="number"
+                <FormNumberInput
                   value={character.currentHp}
-                  onChange={(e) =>
-                    onChange({ currentHp: parseInt(e.target.value) || 0 })
+                  onChange={(value) =>
+                    onChange({ currentHp: parseInt(value, 10) || 0 })
                   }
-                  className="w-16 text-center text-2xl font-bold rounded bg-input border border-border py-1"
+                  className="w-18"
+                  inputClassName="rounded bg-input py-1 text-center text-2xl font-bold"
+                  ariaLabel="Puntos de golpe actuales"
+                  compact
                 />
                 <div className="text-xs text-muted-foreground">Actual</div>
               </div>
               <span className="text-2xl text-muted-foreground">/</span>
               <div className="text-center">
-                <input
-                  type="number"
+                <FormNumberInput
                   value={character.hp}
-                  onChange={(e) =>
-                    onChange({ hp: parseInt(e.target.value) || 0 })
+                  onChange={(value) =>
+                    onChange({ hp: parseInt(value, 10) || 0 })
                   }
-                  className="w-16 text-center text-2xl font-bold rounded bg-input border border-border py-1"
+                  className="w-18"
+                  inputClassName="rounded bg-input py-1 text-center text-2xl font-bold"
+                  ariaLabel="Puntos de golpe maximos"
+                  compact
                 />
                 <div className="text-xs text-muted-foreground">Max.</div>
               </div>
             </div>
             <div className="mt-2 flex items-center justify-center gap-2">
               <span className="text-xs text-muted-foreground">No letal:</span>
-              <input
-                type="number"
+              <FormNumberInput
                 value={character.nonlethalDamage}
-                onChange={(e) =>
-                  onChange({ nonlethalDamage: parseInt(e.target.value) || 0 })
+                onChange={(value) =>
+                  onChange({ nonlethalDamage: parseInt(value, 10) || 0 })
                 }
-                className="w-12 text-center text-sm rounded bg-input border border-border py-0.5"
+                className="w-14"
+                inputClassName="rounded bg-input py-0.5 text-center text-sm"
+                ariaLabel="Dano no letal"
+                compact
               />
             </div>
           </div>
@@ -126,39 +145,72 @@ export function Combat({
             </div>
             <div className="grid grid-cols-3 gap-2">
               <div className="text-center">
-                <input
-                  type="number"
+                <div className="text-2xl font-bold text-gold">
+                  {armorClassTotal}
+                </div>
+                <div className="text-[11px] text-muted-foreground">Total</div>
+                <FormNumberInput
                   value={character.armorClass}
-                  onChange={(e) =>
-                    onChange({ armorClass: parseInt(e.target.value) || 0 })
+                  onChange={(value) =>
+                    onChange({ armorClass: parseInt(value, 10) || 0 })
                   }
-                  className="w-14 text-center text-xl font-bold rounded bg-input border border-border py-1"
+                  className="mt-2 w-16"
+                  inputClassName="rounded bg-input py-1 text-center text-sm font-semibold"
+                  ariaLabel="Clase de armadura base"
+                  compact
                 />
-                <div className="text-xs text-muted-foreground">AC</div>
+                <div className="text-xs text-muted-foreground">Base AC</div>
+                {equipmentBonuses.armorClass !== 0 ? (
+                  <div className="text-[10px] text-gold/75">
+                    Eq. {formatModifier(equipmentBonuses.armorClass)}
+                  </div>
+                ) : null}
               </div>
               <div className="text-center">
-                <input
-                  type="number"
+                <div className="text-2xl font-bold text-gold">
+                  {touchACTotal}
+                </div>
+                <div className="text-[11px] text-muted-foreground">Total</div>
+                <FormNumberInput
                   value={character.touchAC}
-                  onChange={(e) =>
-                    onChange({ touchAC: parseInt(e.target.value) || 0 })
+                  onChange={(value) =>
+                    onChange({ touchAC: parseInt(value, 10) || 0 })
                   }
-                  className="w-14 text-center text-xl font-bold rounded bg-input border border-border py-1"
+                  className="mt-2 w-16"
+                  inputClassName="rounded bg-input py-1 text-center text-sm font-semibold"
+                  ariaLabel="Clase de armadura de toque base"
+                  compact
                 />
-                <div className="text-xs text-muted-foreground">Toque</div>
+                <div className="text-xs text-muted-foreground">Base toque</div>
+                {equipmentBonuses.touchAC !== 0 ? (
+                  <div className="text-[10px] text-gold/75">
+                    Eq. {formatModifier(equipmentBonuses.touchAC)}
+                  </div>
+                ) : null}
               </div>
               <div className="text-center">
-                <input
-                  type="number"
+                <div className="text-2xl font-bold text-gold">
+                  {flatFootedACTotal}
+                </div>
+                <div className="text-[11px] text-muted-foreground">Total</div>
+                <FormNumberInput
                   value={character.flatFootedAC}
-                  onChange={(e) =>
-                    onChange({ flatFootedAC: parseInt(e.target.value) || 0 })
+                  onChange={(value) =>
+                    onChange({ flatFootedAC: parseInt(value, 10) || 0 })
                   }
-                  className="w-14 text-center text-xl font-bold rounded bg-input border border-border py-1"
+                  className="mt-2 w-16"
+                  inputClassName="rounded bg-input py-1 text-center text-sm font-semibold"
+                  ariaLabel="Clase de armadura desprevenido base"
+                  compact
                 />
                 <div className="text-xs text-muted-foreground">
-                  Desprevenido
+                  Base desprevenido
                 </div>
+                {equipmentBonuses.flatFootedAC !== 0 ? (
+                  <div className="text-[10px] text-gold/75">
+                    Eq. {formatModifier(equipmentBonuses.flatFootedAC)}
+                  </div>
+                ) : null}
               </div>
             </div>
           </div>
@@ -181,6 +233,14 @@ export function Combat({
                       ...(character.initiative !== 0
                         ? [{ label: "Varios", value: character.initiative }]
                         : []),
+                      ...(equipmentBonuses.initiative !== 0
+                        ? [
+                            {
+                              label: "Equipo",
+                              value: equipmentBonuses.initiative,
+                            },
+                          ]
+                        : []),
                     ])
                   }
                 />
@@ -190,15 +250,22 @@ export function Combat({
               <span className="text-muted-foreground">
                 = {formatModifier(dexMod)} DEX +
               </span>
-              <input
-                type="number"
+              <FormNumberInput
                 value={character.initiative}
-                onChange={(e) =>
-                  onChange({ initiative: parseInt(e.target.value) || 0 })
+                onChange={(value) =>
+                  onChange({ initiative: parseInt(value, 10) || 0 })
                 }
-                className="w-10 text-center text-sm rounded bg-input border border-border py-0.5"
+                className="w-12"
+                inputClassName="rounded bg-input py-0.5 text-center text-sm"
+                ariaLabel="Modificador varios de iniciativa"
+                compact
               />
               <span className="text-muted-foreground">varios</span>
+              {equipmentBonuses.initiative !== 0 ? (
+                <span className="text-gold">
+                  + {formatModifier(equipmentBonuses.initiative)} equipo
+                </span>
+              ) : null}
             </div>
           </div>
 
@@ -206,13 +273,15 @@ export function Combat({
           <div className="p-3 rounded bg-secondary/30 border border-border/50">
             <div className="flex items-center justify-between">
               <span className="text-sm font-semibold">Bono base de ataque</span>
-              <input
-                type="number"
+              <FormNumberInput
                 value={character.baseAttackBonus}
-                onChange={(e) =>
-                  onChange({ baseAttackBonus: parseInt(e.target.value) || 0 })
+                onChange={(value) =>
+                  onChange({ baseAttackBonus: parseInt(value, 10) || 0 })
                 }
-                className="w-14 text-center text-xl font-bold rounded bg-input border border-border py-1"
+                className="w-18"
+                inputClassName="rounded bg-input py-1 text-center text-xl font-bold"
+                ariaLabel="Bono base de ataque"
+                compact
               />
             </div>
           </div>
@@ -222,13 +291,15 @@ export function Combat({
             <div className="flex items-center justify-between">
               <span className="text-sm font-semibold">Velocidad</span>
               <div className="flex items-center gap-1">
-                <input
-                  type="number"
+                <FormNumberInput
                   value={character.speed}
-                  onChange={(e) =>
-                    onChange({ speed: parseInt(e.target.value) || 0 })
+                  onChange={(value) =>
+                    onChange({ speed: parseInt(value, 10) || 0 })
                   }
-                  className="w-14 text-center text-xl font-bold rounded bg-input border border-border py-1"
+                  className="w-18"
+                  inputClassName="rounded bg-input py-1 text-center text-xl font-bold"
+                  ariaLabel="Velocidad en pies"
+                  compact
                 />
                 <span className="text-sm text-muted-foreground">pies</span>
               </div>

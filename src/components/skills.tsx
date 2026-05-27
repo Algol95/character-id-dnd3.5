@@ -1,11 +1,15 @@
 import { DiceButton } from "./diceButton";
+import { FormCheckbox } from "@/components/formCheckbox";
+import { FormNumberInput } from "@/components/formNumberInput";
 import { SectionShell } from "./sectionShell";
 import {
   formatModifier,
   getAbilityModifier,
+  type AbilityScoreField,
   type CharacterData,
   type Skill,
 } from "@/lib/character-types";
+import type { EquipmentBonuses } from "@/lib/equipment-effects";
 
 /**
  * Propiedades de la seccion de habilidades.
@@ -18,6 +22,7 @@ import {
  */
 interface SkillsProps {
   character: CharacterData;
+  equipmentBonuses: EquipmentBonuses;
   onChange: (updates: Partial<CharacterData>) => void;
   onRollSkill: (
     skillName: string,
@@ -27,7 +32,7 @@ interface SkillsProps {
   onToggle?: () => void;
 }
 
-const ABILITY_KEYS: Record<string, keyof CharacterData> = {
+const ABILITY_KEYS: Record<string, AbilityScoreField> = {
   STR: "strength",
   DEX: "dexterity",
   CON: "constitution",
@@ -74,6 +79,7 @@ function getSkillPointCost(classSkill: boolean) {
  */
 export function Skills({
   character,
+  equipmentBonuses,
   onChange,
   onRollSkill,
   isOpen,
@@ -136,12 +142,13 @@ export function Skills({
           <span className="block text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
             Puntos a invertir
           </span>
-          <input
-            type="number"
+          <FormNumberInput
             value={character.skillPointsToInvest}
-            onChange={(e) => handleSkillPointsToInvestChange(e.target.value)}
-            className="w-full rounded border border-border bg-input px-3 py-2 text-sm"
+            onChange={handleSkillPointsToInvestChange}
+            className="w-full"
+            inputClassName="border border-border bg-input px-3 py-2"
             min={spentSkillPoints}
+            ariaLabel="Puntos a invertir"
           />
         </label>
 
@@ -149,12 +156,13 @@ export function Skills({
           <span className="block text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
             Maximo por rango
           </span>
-          <input
-            type="number"
+          <FormNumberInput
             value={character.maxSkillRank}
-            onChange={(e) => handleMaxSkillRankChange(e.target.value)}
-            className="w-full rounded border border-border bg-input px-3 py-2 text-sm"
+            onChange={handleMaxSkillRankChange}
+            className="w-full"
+            inputClassName="border border-border bg-input px-3 py-2"
             min={highestAssignedRank}
+            ariaLabel="Maximo por rango"
           />
         </label>
 
@@ -183,9 +191,13 @@ export function Skills({
           {character.skills.map((skill, index) => {
             const abilityKey = ABILITY_KEYS[skill.ability];
             const abilityMod = getAbilityModifier(
-              character[abilityKey] as number,
+              (character[abilityKey] as number) +
+                (equipmentBonuses.abilityBonuses[abilityKey] ?? 0),
             );
-            const total = skill.ranks + abilityMod + skill.miscMod;
+            const equipmentSkillBonus =
+              equipmentBonuses.skillBonuses[skill.name] ?? 0;
+            const total =
+              skill.ranks + abilityMod + skill.miscMod + equipmentSkillBonus;
             const isUsableUntrained = UNTRAINED_SKILL_NAMES.has(skill.name);
             const pointCost = getSkillPointCost(skill.classSkill);
             const maxAllowedRanks = Math.min(
@@ -200,6 +212,9 @@ export function Skills({
                 : []),
               ...(skill.miscMod !== 0
                 ? [{ label: "Varios", value: skill.miscMod }]
+                : []),
+              ...(equipmentSkillBonus !== 0
+                ? [{ label: "Equipo", value: equipmentSkillBonus }]
                 : []),
             ];
 
@@ -220,9 +235,16 @@ export function Skills({
                       aria-label="Se puede usar sin entrenamiento"
                     />
                   ) : null}
-                  <span className="text-sm truncate" title={skill.name}>
-                    {skill.name}
-                  </span>
+                  <div className="min-w-0">
+                    <span className="text-sm truncate block" title={skill.name}>
+                      {skill.name}
+                    </span>
+                    {equipmentSkillBonus !== 0 ? (
+                      <span className="text-[10px] uppercase tracking-[0.14em] text-gold/75">
+                        Equipo {formatModifier(equipmentSkillBonus)}
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
 
                 <span className="text-xs text-center w-10 text-muted-foreground">
@@ -233,55 +255,39 @@ export function Skills({
                   {formatModifier(total)}
                 </span>
 
-                <input
-                  type="number"
+                <FormNumberInput
                   value={skill.ranks}
-                  onChange={(e) => updateSkillRanks(index, e.target.value)}
-                  className="w-10 text-center text-sm rounded bg-input border border-border py-0.5"
+                  onChange={(value) => updateSkillRanks(index, value)}
+                  className="w-12"
+                  inputClassName="rounded bg-input py-0.5 text-center text-sm"
                   min={0}
                   max={maxAllowedRanks}
                   title={`Cada rango cuesta ${pointCost} punto${pointCost > 1 ? "s" : ""}`}
+                  ariaLabel={`Rangos de ${skill.name}`}
+                  compact
                 />
 
-                <input
-                  type="number"
+                <FormNumberInput
                   value={skill.miscMod}
-                  onChange={(e) =>
+                  onChange={(value) =>
                     updateSkill(index, {
-                      miscMod: parseInt(e.target.value) || 0,
+                      miscMod: parseInt(value, 10) || 0,
                     })
                   }
-                  className="w-10 text-center text-sm rounded bg-input border border-border py-0.5"
+                  className="w-12"
+                  inputClassName="rounded bg-input py-0.5 text-center text-sm"
+                  ariaLabel={`Modificador varios de ${skill.name}`}
+                  compact
                 />
 
                 <div className="flex justify-center w-8">
-                  <label className="relative inline-flex cursor-pointer items-center justify-center">
-                    <input
-                      type="checkbox"
-                      checked={skill.classSkill}
-                      onChange={(e) =>
-                        updateSkill(index, { classSkill: e.target.checked })
-                      }
-                      className="peer sr-only"
-                      aria-label={`Marcar ${skill.name} como habilidad de clase`}
-                    />
-                    <span className="flex h-5 w-5 items-center justify-center rounded-md border border-border/80 bg-input/90 text-transparent shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition-all duration-200 peer-checked:border-gold/60 peer-checked:bg-gold/15 peer-checked:text-gold peer-checked:shadow-[0_0_12px_rgba(212,175,55,0.18)] peer-focus-visible:ring-2 peer-focus-visible:ring-gold/60 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-background group-hover:border-gold/30">
-                      <svg
-                        viewBox="0 0 16 16"
-                        aria-hidden="true"
-                        className="h-3.5 w-3.5"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.2"
-                      >
-                        <path
-                          d="M3.5 8.5 6.5 11.5 12.5 4.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                    </span>
-                  </label>
+                  <FormCheckbox
+                    checked={skill.classSkill}
+                    onChange={(checked: boolean) =>
+                      updateSkill(index, { classSkill: checked })
+                    }
+                    ariaLabel={`Marcar ${skill.name} como habilidad de clase`}
+                  />
                 </div>
               </div>
             );

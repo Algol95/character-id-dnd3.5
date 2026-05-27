@@ -23,6 +23,72 @@ export interface Money {
   copper: number;
 }
 
+export type AbilityScoreField =
+  | "strength"
+  | "dexterity"
+  | "constitution"
+  | "intelligence"
+  | "wisdom"
+  | "charisma";
+
+export type EquipmentSlot =
+  | "head"
+  | "eyes"
+  | "throat"
+  | "shoulders"
+  | "torso"
+  | "body"
+  | "arms"
+  | "hands"
+  | "waist"
+  | "feet"
+  | "ringLeft"
+  | "ringRight"
+  | "armor"
+  | "shield"
+  | "mainHand"
+  | "offHand"
+  | "ranged"
+  | "ammunition";
+
+export type EquippedItemCategory =
+  | "armor"
+  | "shield"
+  | "weapon"
+  | "accessory"
+  | "wondrous";
+
+export type EquipmentEffectTarget =
+  | AbilityScoreField
+  | "initiative"
+  | "armorClass"
+  | "touchAC"
+  | "flatFootedAC"
+  | "fortitude"
+  | "reflex"
+  | "will"
+  | "speed"
+  | "skill"
+  | "specialAbility";
+
+export interface EquippedItemEffect {
+  id: string;
+  target: EquipmentEffectTarget;
+  value: number;
+  skillName?: string;
+  description: string;
+}
+
+export interface EquippedItem {
+  id: string;
+  slot: EquipmentSlot;
+  category: EquippedItemCategory;
+  name: string;
+  description: string;
+  isTwoHanded?: boolean;
+  effects: EquippedItemEffect[];
+}
+
 export interface CharacterData {
   name: string;
   player: string;
@@ -73,6 +139,7 @@ export interface CharacterData {
   skills: Skill[];
   skillPointsToInvest: number;
   maxSkillRank: number;
+  equippedItems: EquippedItem[];
   money: Money;
   equipment: string;
   feats: string;
@@ -347,6 +414,7 @@ export const DEFAULT_CHARACTER: CharacterData = {
   skills: DEFAULT_SKILLS,
   skillPointsToInvest: 0,
   maxSkillRank: 4,
+  equippedItems: [],
   money: {
     platinum: 0,
     gold: 0,

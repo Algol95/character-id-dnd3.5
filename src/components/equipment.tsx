@@ -1,4 +1,5 @@
 import type { CharacterData } from "@/lib/character-types";
+import { FormNumberInput } from "@/components/formNumberInput";
 import { SectionShell } from "./sectionShell";
 
 /**
@@ -21,76 +22,87 @@ export function Equipment({
   onToggle,
 }: EquipmentProps) {
   return (
-    <SectionShell title="EQUIPO Y DINERO" isOpen={isOpen} onToggle={onToggle}>
-      {/* Money */}
+    <SectionShell
+      title="INVENTARIO Y DINERO"
+      isOpen={isOpen}
+      onToggle={onToggle}
+    >
       <div className="mb-4">
         <div className="text-xs text-muted-foreground mb-2">Dinero</div>
         <div className="grid grid-cols-4 gap-2">
           <div className="text-center">
-            <input
-              type="number"
+            <FormNumberInput
               value={character.money.platinum}
-              onChange={(e) =>
+              onChange={(value) =>
                 onChange({
                   money: {
                     ...character.money,
-                    platinum: parseInt(e.target.value) || 0,
+                    platinum: parseInt(value, 10) || 0,
                   },
                 })
               }
-              className="w-full text-center rounded bg-input border border-border py-1"
+              className="w-full"
+              inputClassName="rounded py-1 text-center"
               min={0}
+              ariaLabel="Piezas de platino"
+              compact
             />
             <span className="text-xs text-muted-foreground">PP</span>
           </div>
           <div className="text-center">
-            <input
-              type="number"
+            <FormNumberInput
               value={character.money.gold}
-              onChange={(e) =>
+              onChange={(value) =>
                 onChange({
                   money: {
                     ...character.money,
-                    gold: parseInt(e.target.value) || 0,
+                    gold: parseInt(value, 10) || 0,
                   },
                 })
               }
-              className="w-full text-center rounded bg-input border border-border py-1 text-gold"
+              className="w-full"
+              inputClassName="rounded py-1 text-center text-gold"
               min={0}
+              ariaLabel="Piezas de oro"
+              compact
             />
             <span className="text-xs text-gold">GP</span>
           </div>
           <div className="text-center">
-            <input
-              type="number"
+            <FormNumberInput
               value={character.money.silver}
-              onChange={(e) =>
+              onChange={(value) =>
                 onChange({
                   money: {
                     ...character.money,
-                    silver: parseInt(e.target.value) || 0,
+                    silver: parseInt(value, 10) || 0,
                   },
                 })
               }
-              className="w-full text-center rounded bg-input border border-border py-1"
+              className="w-full"
+              inputClassName="rounded py-1 text-center"
               min={0}
+              ariaLabel="Piezas de plata"
+              compact
             />
             <span className="text-xs text-muted-foreground">SP</span>
           </div>
           <div className="text-center">
-            <input
-              type="number"
+            <FormNumberInput
               value={character.money.copper}
-              onChange={(e) =>
+              onChange={(value) =>
                 onChange({
                   money: {
                     ...character.money,
-                    copper: parseInt(e.target.value) || 0,
+                    copper: parseInt(value, 10) || 0,
                   },
                 })
               }
-              className="w-full text-center rounded bg-input border border-border py-1"
+              className="w-full"
+              inputClassName="rounded py-1 text-center"
               min={0}
+              ariaLabel="Piezas de cobre"
+              compact
             />
             <span className="text-xs text-muted-foreground">CP</span>
           </div>

@@ -1,5 +1,32 @@
 import type { CharacterData } from "@/lib/character-types";
+import { FormNumberInput } from "@/components/formNumberInput";
+import { FormSelect, type FormSelectOption } from "@/components/formSelect";
 import { SectionShell } from "./sectionShell";
+
+const ALIGNMENT_OPTIONS: FormSelectOption[] = [
+  { value: "", label: "Selecciona..." },
+  { value: "LG", label: "Legal bueno" },
+  { value: "NG", label: "Neutral bueno" },
+  { value: "CG", label: "Caotico bueno" },
+  { value: "LN", label: "Legal neutral" },
+  { value: "N", label: "Neutral verdadero" },
+  { value: "CN", label: "Caotico neutral" },
+  { value: "LE", label: "Legal maligno" },
+  { value: "NE", label: "Neutral maligno" },
+  { value: "CE", label: "Caotico maligno" },
+];
+
+const SIZE_OPTIONS: FormSelectOption[] = [
+  { value: "Fine", label: "Diminuto" },
+  { value: "Diminutive", label: "Minimo" },
+  { value: "Tiny", label: "Muy pequeno" },
+  { value: "Small", label: "Pequeno" },
+  { value: "Medium", label: "Mediano" },
+  { value: "Large", label: "Grande" },
+  { value: "Huge", label: "Enorme" },
+  { value: "Gargantuan", label: "Gargantuesco" },
+  { value: "Colossal", label: "Colosal" },
+];
 
 /**
  * Propiedades de la seccion de informacion general del personaje.
@@ -75,12 +102,13 @@ export function BasicInfo({
           <label className="text-xs text-muted-foreground block mb-1">
             Nivel
           </label>
-          <input
-            type="number"
+          <FormNumberInput
             value={character.level}
-            onChange={(e) => onChange({ level: parseInt(e.target.value) || 1 })}
-            className="w-full rounded bg-input border border-border px-2 py-2"
+            onChange={(value) => onChange({ level: parseInt(value, 10) || 1 })}
+            className="w-full"
+            inputClassName="rounded px-2 py-2"
             min={1}
+            ariaLabel="Nivel"
           />
         </div>
 
@@ -103,22 +131,12 @@ export function BasicInfo({
           <label className="text-xs text-muted-foreground block mb-1">
             Alineamiento
           </label>
-          <select
+          <FormSelect
             value={character.alignment}
-            onChange={(e) => onChange({ alignment: e.target.value })}
-            className="w-full rounded bg-input border border-border px-2 py-2"
-          >
-            <option value="">Selecciona...</option>
-            <option value="LG">Legal bueno</option>
-            <option value="NG">Neutral bueno</option>
-            <option value="CG">Caotico bueno</option>
-            <option value="LN">Legal neutral</option>
-            <option value="N">Neutral verdadero</option>
-            <option value="CN">Caotico neutral</option>
-            <option value="LE">Legal maligno</option>
-            <option value="NE">Neutral maligno</option>
-            <option value="CE">Caotico maligno</option>
-          </select>
+            onChange={(value: string) => onChange({ alignment: value })}
+            options={ALIGNMENT_OPTIONS}
+            ariaLabel="Seleccionar alineamiento"
+          />
         </div>
 
         {/* Deity */}
@@ -140,21 +158,12 @@ export function BasicInfo({
           <label className="text-xs text-muted-foreground block mb-1">
             Tamano
           </label>
-          <select
+          <FormSelect
             value={character.size}
-            onChange={(e) => onChange({ size: e.target.value })}
-            className="w-full rounded bg-input border border-border px-2 py-2"
-          >
-            <option value="Fine">Diminuto</option>
-            <option value="Diminutive">Minimo</option>
-            <option value="Tiny">Muy pequeno</option>
-            <option value="Small">Pequeno</option>
-            <option value="Medium">Mediano</option>
-            <option value="Large">Grande</option>
-            <option value="Huge">Enorme</option>
-            <option value="Gargantuan">Gargantuesco</option>
-            <option value="Colossal">Colosal</option>
-          </select>
+            onChange={(value: string) => onChange({ size: value })}
+            options={SIZE_OPTIONS}
+            ariaLabel="Seleccionar tamano"
+          />
         </div>
 
         {/* Age */}
@@ -162,12 +171,13 @@ export function BasicInfo({
           <label className="text-xs text-muted-foreground block mb-1">
             Edad
           </label>
-          <input
-            type="number"
+          <FormNumberInput
             value={character.age || ""}
-            onChange={(e) => onChange({ age: parseInt(e.target.value) || 0 })}
-            className="w-full rounded bg-input border border-border px-2 py-2"
+            onChange={(value) => onChange({ age: parseInt(value, 10) || 0 })}
+            className="w-full"
+            inputClassName="rounded px-2 py-2"
             placeholder="25"
+            ariaLabel="Edad"
           />
         </div>
 

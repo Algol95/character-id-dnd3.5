@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { DiceButton } from "./diceButton";
+import { FormNumberInput } from "@/components/formNumberInput";
 import { SectionShell } from "./sectionShell";
 import { type CharacterData, type Attack } from "@/lib/character-types";
 
@@ -131,15 +132,17 @@ export function Attacks({
                 />
                 <div className="flex items-center gap-1">
                   <span className="text-xs text-muted-foreground">+</span>
-                  <input
-                    type="number"
+                  <FormNumberInput
                     value={attack.attackBonus}
-                    onChange={(e) =>
+                    onChange={(value) =>
                       updateAttack(index, {
-                        attackBonus: parseInt(e.target.value) || 0,
+                        attackBonus: parseInt(value, 10) || 0,
                       })
                     }
-                    className="w-12 text-center text-sm rounded bg-input border border-border py-1"
+                    className="w-14"
+                    inputClassName="rounded bg-input py-1 text-center text-sm"
+                    ariaLabel={`Bono de ataque de ${attack.name || "ataque"}`}
+                    compact
                   />
                 </div>
                 <input
@@ -224,17 +227,18 @@ export function Attacks({
             className="col-span-2 md:col-span-1 text-sm rounded bg-input border border-border px-2 py-1"
             placeholder="Nueva arma..."
           />
-          <input
-            type="number"
-            value={newAttack.attackBonus}
-            onChange={(e) =>
+          <FormNumberInput
+            value={newAttack.attackBonus ?? 0}
+            onChange={(value) =>
               setNewAttack({
                 ...newAttack,
-                attackBonus: parseInt(e.target.value) || 0,
+                attackBonus: parseInt(value, 10) || 0,
               })
             }
-            className="text-sm rounded bg-input border border-border px-2 py-1"
+            className="w-full"
+            inputClassName="rounded bg-input px-2 py-1 text-sm"
             placeholder="Ataque +X"
+            ariaLabel="Bono del nuevo ataque"
           />
           <input
             type="text"

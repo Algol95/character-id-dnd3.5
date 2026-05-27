@@ -1,16 +1,19 @@
 import { DiceButton } from "./diceButton";
+import { FormNumberInput } from "@/components/formNumberInput";
 import { SectionShell } from "./sectionShell";
 import {
   formatModifier,
   getAbilityModifier,
   type CharacterData,
 } from "@/lib/character-types";
+import type { EquipmentBonuses } from "@/lib/equipment-effects";
 
 /**
  * Propiedades de la seccion de tiradas de salvacion.
  */
 interface SavingThrowsProps {
   character: CharacterData;
+  equipmentBonuses: EquipmentBonuses;
   onChange: (updates: Partial<CharacterData>) => void;
   onRollSave: (
     saveName: string,
@@ -26,6 +29,7 @@ interface SavingThrowsProps {
  */
 export function SavingThrows({
   character,
+  equipmentBonuses,
   onChange,
   onRollSave,
   isOpen,
@@ -69,17 +73,31 @@ export function SavingThrows({
     >
       <div className="space-y-4">
         {saves.map((save) => {
-          const abilityMod = getAbilityModifier(character[save.abilityKey]);
+          const abilityMod = getAbilityModifier(
+            character[save.abilityKey] +
+              (equipmentBonuses.abilityBonuses[save.abilityKey] ?? 0),
+          );
           const baseSave = character[save.baseKey];
           const magicMod = character[save.magicKey];
           const miscMod = character[save.miscKey];
-          const total = baseSave + abilityMod + magicMod + miscMod;
+          const equipmentMod =
+            equipmentBonuses[
+              save.baseKey.replace("Base", "") as
+                | "fortitude"
+                | "reflex"
+                | "will"
+            ];
+          const total =
+            baseSave + abilityMod + magicMod + miscMod + equipmentMod;
 
           const modifiers = [
             { label: "Base", value: baseSave },
             { label: save.ability, value: abilityMod },
             ...(magicMod !== 0 ? [{ label: "Magia", value: magicMod }] : []),
             ...(miscMod !== 0 ? [{ label: "Varios", value: miscMod }] : []),
+            ...(equipmentMod !== 0
+              ? [{ label: "Equipo", value: equipmentMod }]
+              : []),
           ];
 
           return (
@@ -113,6 +131,11 @@ export function SavingThrows({
                   <p className="mt-1 text-2xl font-bold leading-none text-gold sm:text-3xl">
                     {formatModifier(total)}
                   </p>
+                  {equipmentMod !== 0 ? (
+                    <p className="mt-1 text-xs text-gold/75">
+                      Equipo {formatModifier(equipmentMod)}
+                    </p>
+                  ) : null}
                 </div>
               </div>
 
@@ -121,16 +144,17 @@ export function SavingThrows({
                   <span className="mb-1 block text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
                     Base
                   </span>
-                  <input
-                    type="number"
+                  <FormNumberInput
                     value={baseSave}
-                    onChange={(e) =>
+                    onChange={(value) =>
                       onChange({
-                        [save.baseKey]: parseInt(e.target.value) || 0,
+                        [save.baseKey]: parseInt(value, 10) || 0,
                       })
                     }
-                    className="w-full rounded-xl px-3 py-2 text-center text-base font-semibold"
+                    className="w-full"
+                    inputClassName="rounded-xl px-3 py-2 text-center text-base font-semibold"
                     title="Salvacion base"
+                    ariaLabel={`Salvacion base de ${save.name}`}
                   />
                 </label>
 
@@ -147,16 +171,17 @@ export function SavingThrows({
                   <span className="mb-1 block text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
                     Magia
                   </span>
-                  <input
-                    type="number"
+                  <FormNumberInput
                     value={magicMod}
-                    onChange={(e) =>
+                    onChange={(value) =>
                       onChange({
-                        [save.magicKey]: parseInt(e.target.value) || 0,
+                        [save.magicKey]: parseInt(value, 10) || 0,
                       })
                     }
-                    className="w-full rounded-xl px-3 py-2 text-center text-base font-semibold"
+                    className="w-full"
+                    inputClassName="rounded-xl px-3 py-2 text-center text-base font-semibold"
                     title="Modificador de magia"
+                    ariaLabel={`Modificador de magia de ${save.name}`}
                   />
                 </label>
 
@@ -164,16 +189,17 @@ export function SavingThrows({
                   <span className="mb-1 block text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
                     Varios
                   </span>
-                  <input
-                    type="number"
+                  <FormNumberInput
                     value={miscMod}
-                    onChange={(e) =>
+                    onChange={(value) =>
                       onChange({
-                        [save.miscKey]: parseInt(e.target.value) || 0,
+                        [save.miscKey]: parseInt(value, 10) || 0,
                       })
                     }
-                    className="w-full rounded-xl px-3 py-2 text-center text-base font-semibold"
+                    className="w-full"
+                    inputClassName="rounded-xl px-3 py-2 text-center text-base font-semibold"
                     title="Modificador variado"
+                    ariaLabel={`Modificador varios de ${save.name}`}
                   />
                 </label>
               </div>
