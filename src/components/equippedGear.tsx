@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { SectionShell } from "./sectionShell";
 import { EquippedItemModal } from "./equippedItemModal";
+import { Popover } from "./popover";
 import {
   type CharacterData,
   type EquipmentSlot,
@@ -45,7 +46,51 @@ const BODY_SLOT_PLACEMENTS: SlotPlacement[] = [
 
 const LEFT_SIDE_SLOTS: EquipmentSlot[] = ["armor", "offHand"];
 
-const RIGHT_SIDE_SLOTS: EquipmentSlot[] = ["mainHand", "ranged", "ammunition"];
+const RIGHT_SIDE_SLOTS: EquipmentSlot[] = ["mainHand", "ranged"];
+
+function formatWeaponSummary(item?: EquippedItem): string | null {
+  if (!item || item.category !== "weapon" || !item.weaponProfile) {
+    return null;
+  }
+
+  const {
+    damageDiceCount,
+    damageDiceType,
+    criticalRangeStart,
+    criticalMultiplier,
+  } = item.weaponProfile;
+  const criticalRange =
+    criticalRangeStart >= 20 ? "20" : `${criticalRangeStart}-20`;
+
+  return `${damageDiceCount}d${damageDiceType} | ${criticalRange}/x${criticalMultiplier}`;
+}
+
+function getSlotPopoverContent(slot: EquipmentSlot, item?: EquippedItem) {
+  if (!item) {
+    return (
+      <div className="space-y-1">
+        <div className="text-[10px] uppercase tracking-[0.18em] text-gold/80">
+          {EQUIPMENT_SLOT_LABELS[slot]}
+        </div>
+        <div>Ranura vacia</div>
+      </div>
+    );
+  }
+
+  const description = item.description.trim();
+  const weaponSummary = formatWeaponSummary(item);
+  const summaryText = description || weaponSummary || "Objeto equipado";
+
+  return (
+    <div className="space-y-1">
+      <div className="text-[10px] uppercase tracking-[0.18em] text-gold/80">
+        {EQUIPMENT_SLOT_LABELS[slot]}
+      </div>
+      <div className="font-semibold text-foreground">{item.name}</div>
+      <div className="text-muted-foreground">{summaryText}</div>
+    </div>
+  );
+}
 
 function SlotButton({
   slot,
@@ -64,47 +109,19 @@ function SlotButton({
   const squareClass = `flex items-center justify-center rounded-xl border transition-colors ${hasItem ? "border-gold/55 bg-gold/12 text-gold" : "border-border/70 bg-input/85 text-muted-foreground group-hover:border-gold/45 group-hover:text-gold"}`;
 
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`group transition-all duration-200 ${compact ? "w-14 bg-transparent p-0 text-center hover:shadow-none" : "w-full rounded-xl border border-border/60 bg-background/20 px-2 py-2 text-center hover:border-gold/45 hover:bg-gold/8 hover:shadow-[0_0_18px_rgba(212,175,55,0.08)]"}`}
-      title={item ? item.name : `Anadir en ${slotLabel}`}
-    >
-      {compact ? (
-        <div className="flex flex-col items-center gap-0.5 text-center">
-          <div className="max-w-full text-[7px] uppercase leading-3 tracking-widest text-muted-foreground">
-            {slotLabel}
-          </div>
+    <Popover content={getSlotPopoverContent(slot, item)} side="top" align="center">
+      <button
+        type="button"
+        onClick={onClick}
+        className={`group transition-all duration-200 ${compact ? "w-14 bg-transparent p-0 text-center hover:shadow-none" : "w-full rounded-xl border border-border/60 bg-background/20 px-2 py-2 text-center hover:border-gold/45 hover:bg-gold/8 hover:shadow-[0_0_18px_rgba(212,175,55,0.08)]"}`}
+      >
+        {compact ? (
+          <div className="flex flex-col items-center gap-0.5 text-center">
+            <div className="max-w-full text-[7px] uppercase leading-3 tracking-widest text-muted-foreground">
+              {slotLabel}
+            </div>
 
-          <span className={`${squareClass} h-7.5 w-7.5`}>
-            {hasItem ? (
-              <svg
-                viewBox="0 0 20 20"
-                aria-hidden="true"
-                className="h-3.5 w-3.5"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-              >
-                <path
-                  d="M4.5 10.5 8 14l7.5-8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            ) : (
-              <span className="text-xl leading-none">+</span>
-            )}
-          </span>
-        </div>
-      ) : (
-        <div className="flex flex-col items-center gap-1.5">
-          <div className="w-full text-center text-[8px] uppercase tracking-[0.12em] text-muted-foreground">
-            {slotLabel}
-          </div>
-
-          <div className="flex flex-col items-center gap-1.5">
-            <span className={`${squareClass} h-9 w-9 shrink-0`}>
+            <span className={`${squareClass} h-7.5 w-7.5`}>
               {hasItem ? (
                 <svg
                   viewBox="0 0 20 20"
@@ -124,16 +141,45 @@ function SlotButton({
                 <span className="text-xl leading-none">+</span>
               )}
             </span>
-
-            {itemLabel ? (
-              <div className="max-w-full text-center truncate text-[12px] leading-4 text-foreground">
-                {itemLabel}
-              </div>
-            ) : null}
           </div>
-        </div>
-      )}
-    </button>
+        ) : (
+          <div className="flex flex-col items-center gap-1.5">
+            <div className="w-full text-center text-[8px] uppercase tracking-[0.12em] text-muted-foreground">
+              {slotLabel}
+            </div>
+
+            <div className="flex flex-col items-center gap-1.5">
+              <span className={`${squareClass} h-9 w-9 shrink-0`}>
+                {hasItem ? (
+                  <svg
+                    viewBox="0 0 20 20"
+                    aria-hidden="true"
+                    className="h-3.5 w-3.5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                  >
+                    <path
+                      d="M4.5 10.5 8 14l7.5-8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                ) : (
+                  <span className="text-xl leading-none">+</span>
+                )}
+              </span>
+
+              {itemLabel ? (
+                <div className="max-w-full text-center truncate text-[12px] leading-4 text-foreground">
+                  {itemLabel}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        )}
+      </button>
+    </Popover>
   );
 }
 
@@ -247,13 +293,6 @@ export function EquippedGear({
         ? mainHandOccupiesOffHand
         : false;
 
-  const twoHandedDisabledReason =
-    activeSlot === "mainHand" && rangedOccupiesOffHand
-      ? "No disponible mientras el arma a distancia este marcada como a dos manos."
-      : activeSlot === "ranged" && mainHandOccupiesOffHand
-        ? "No disponible mientras la mano principal este marcada como a dos manos."
-        : undefined;
-
   return (
     <>
       <SectionShell title="EQUIPAMIENTO" isOpen={isOpen} onToggle={onToggle}>
@@ -310,7 +349,6 @@ export function EquippedGear({
           item={activeItem}
           skillNames={skillNames}
           twoHandedDisabled={isTwoHandedDisabled}
-          twoHandedDisabledReason={twoHandedDisabledReason}
           onClose={() => setActiveSlot(null)}
           onSave={handleSaveItem}
           onDelete={handleDeleteItem}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 
@@ -9,6 +9,7 @@ export interface FormSelectOption {
   value: string;
   label: string;
   disabled?: boolean;
+  icon?: ReactNode;
 }
 
 /**
@@ -135,15 +136,21 @@ export function FormSelect({
             triggerClassName,
           )}
         >
-          <span
-            className={cn(
-              "min-w-0 flex-1 pr-1 text-[13px] leading-tight whitespace-normal wrap-break-word",
-              textToneClass,
-              triggerCaseClass,
-            )}
-            title={selectedOption?.label ?? placeholder}
-          >
-            {selectedOption?.label ?? placeholder}
+          <span className="flex min-w-0 flex-1 items-center gap-2 pr-1">
+            {selectedOption?.icon ? (
+              <span className="shrink-0">{selectedOption.icon}</span>
+            ) : null}
+
+            <span
+              className={cn(
+                "min-w-0 flex-1 text-[13px] leading-tight whitespace-normal wrap-break-word",
+                textToneClass,
+                triggerCaseClass,
+              )}
+              title={selectedOption?.label ?? placeholder}
+            >
+              {selectedOption?.label ?? placeholder}
+            </span>
           </span>
 
           <svg
@@ -209,6 +216,10 @@ export function FormSelect({
                           : "cursor-pointer",
                       )}
                     >
+                      {option.icon ? (
+                        <span className="shrink-0">{option.icon}</span>
+                      ) : null}
+
                       <span className="min-w-0 flex-1 leading-tight whitespace-normal wrap-break-word">
                         {option.label}
                       </span>

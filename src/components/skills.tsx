@@ -1,6 +1,7 @@
 import { DiceButton } from "./diceButton";
 import { FormCheckbox } from "@/components/formCheckbox";
 import { FormNumberInput } from "@/components/formNumberInput";
+import { Popover } from "./popover";
 import { SectionShell } from "./sectionShell";
 import {
   formatModifier,
@@ -235,16 +236,23 @@ export function Skills({
                       aria-label="Se puede usar sin entrenamiento"
                     />
                   ) : null}
-                  <div className="min-w-0">
-                    <span className="text-sm truncate block" title={skill.name}>
-                      {skill.name}
-                    </span>
-                    {equipmentSkillBonus !== 0 ? (
-                      <span className="text-[10px] uppercase tracking-[0.14em] text-gold/75">
-                        Equipo {formatModifier(equipmentSkillBonus)}
+                  <Popover
+                    content={<div>{skill.name}</div>}
+                    side="top"
+                    align="start"
+                    anchorClassName="min-w-0"
+                  >
+                    <div className="min-w-0">
+                      <span className="text-sm truncate block">
+                        {skill.name}
                       </span>
-                    ) : null}
-                  </div>
+                      {equipmentSkillBonus !== 0 ? (
+                        <span className="text-[10px] uppercase tracking-[0.14em] text-gold/75">
+                          Equipo {formatModifier(equipmentSkillBonus)}
+                        </span>
+                      ) : null}
+                    </div>
+                  </Popover>
                 </div>
 
                 <span className="text-xs text-center w-10 text-muted-foreground">

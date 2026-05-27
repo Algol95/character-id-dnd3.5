@@ -1,4 +1,5 @@
 import { SectionShell } from "./sectionShell";
+import { Popover } from "./popover";
 import type { DiceRollMode } from "@/hooks/use-dice-roller";
 
 const DICE_TYPES = [
@@ -47,25 +48,31 @@ export function DiceRoller({ onRoll, isOpen, onToggle }: DiceRollerProps) {
     >
       <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
         {DICE_TYPES.map((dice) => (
-          <button
+          <Popover
             key={dice.sides}
-            onClick={() => onRoll(`Tirada de ${dice.label}`, [], dice.sides)}
-            className={`
-              relative group flex flex-col items-center justify-center p-3 rounded-lg
-              bg-secondary/50 border border-border
-              hover:border-gold hover:bg-gold/10
-              transition-all duration-200 hover:scale-105
-              active:scale-95
-            `}
-            title={`Tirar un ${dice.label}`}
+            content={<div>{dice.label}</div>}
+            side="top"
+            align="center"
           >
-            <div className={`relative ${dice.color}`}>
-              <DiceIcon sides={dice.sides} className="w-8 h-8" />
-            </div>
-            <span className="text-xs mt-1 text-muted-foreground group-hover:text-gold transition-colors">
-              {dice.label}
-            </span>
-          </button>
+            <button
+              onClick={() => onRoll(`Tirada de ${dice.label}`, [], dice.sides)}
+              className={`
+                relative group flex flex-col items-center justify-center p-3 rounded-lg
+                bg-secondary/50 border border-border
+                hover:border-gold hover:bg-gold/10
+                transition-all duration-200 hover:scale-105
+                active:scale-95
+              `}
+              aria-label={`Tirar un ${dice.label}`}
+            >
+              <div className={`relative ${dice.color}`}>
+                <DiceIcon sides={dice.sides} className="w-8 h-8" />
+              </div>
+              <span className="text-xs mt-1 text-muted-foreground group-hover:text-gold transition-colors">
+                {dice.label}
+              </span>
+            </button>
+          </Popover>
         ))}
       </div>
 

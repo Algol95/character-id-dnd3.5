@@ -72,6 +72,7 @@ export function AbilityScores({
   const touchACTotal = character.touchAC + equipmentBonuses.touchAC;
   const flatFootedACTotal =
     character.flatFootedAC + equipmentBonuses.flatFootedAC;
+  const speedTotal = character.speed + equipmentBonuses.speed;
   const hpCurrent = character.currentHp;
   const hpMax = Math.max(character.hp, 0);
   const hpSafeMax = Math.max(hpMax, 1);
@@ -429,9 +430,14 @@ export function AbilityScores({
               <div className="mt-3 flex items-center justify-between gap-3">
                 <div>
                   <p className="text-3xl font-bold leading-none text-gold">
-                    {character.speed}
+                    {speedTotal}
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">pies</p>
+                  {equipmentBonuses.speed !== 0 ? (
+                    <p className="mt-2 text-xs text-gold/75">
+                      Equipo {formatModifier(equipmentBonuses.speed)}
+                    </p>
+                  ) : null}
                 </div>
                 <FormNumberInput
                   value={character.speed}

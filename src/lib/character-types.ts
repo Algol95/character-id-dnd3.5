@@ -79,6 +79,13 @@ export interface EquippedItemEffect {
   description: string;
 }
 
+export interface WeaponProfile {
+  damageDiceCount: number;
+  damageDiceType: number;
+  criticalRangeStart: number;
+  criticalMultiplier: number;
+}
+
 export interface EquippedItem {
   id: string;
   slot: EquipmentSlot;
@@ -86,6 +93,7 @@ export interface EquippedItem {
   name: string;
   description: string;
   isTwoHanded?: boolean;
+  weaponProfile?: WeaponProfile;
   effects: EquippedItemEffect[];
 }
 

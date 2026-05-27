@@ -1,4 +1,5 @@
 import type { CharacterData } from "@/lib/character-types";
+import type { EquipmentBonuses } from "@/lib/equipment-effects";
 import { SectionShell } from "./sectionShell";
 
 /**
@@ -6,6 +7,7 @@ import { SectionShell } from "./sectionShell";
  */
 interface FeatsProps {
   character: CharacterData;
+  equipmentBonuses: EquipmentBonuses;
   onChange: (updates: Partial<CharacterData>) => void;
   isOpen?: boolean;
   onToggle?: () => void;
@@ -15,7 +17,13 @@ interface FeatsProps {
  * Reune los textos libres del personaje, como dotes, rasgos especiales y
  * anotaciones de campana.
  */
-export function Feats({ character, onChange, isOpen, onToggle }: FeatsProps) {
+export function Feats({
+  character,
+  equipmentBonuses,
+  onChange,
+  isOpen,
+  onToggle,
+}: FeatsProps) {
   return (
     <SectionShell
       title="DOTES Y HABILIDADES ESPECIALES"
@@ -45,6 +53,28 @@ export function Feats({ character, onChange, isOpen, onToggle }: FeatsProps) {
             className="w-full h-32 rounded bg-input border border-border px-3 py-2 text-sm resize-none"
             placeholder="Escribe habilidades especiales, rasgos de clase y raciales...&#10;&#10;- Vision en la oscuridad 60 pies&#10;- Ira 1/dia&#10;- Movimiento rapido"
           />
+
+          {equipmentBonuses.specialAbilities.length > 0 ? (
+            <div className="mt-3 rounded border border-gold/20 bg-gold/8 px-3 py-3">
+              <div className="mb-2 text-xs text-gold/90">
+                Habilidades especiales del equipo
+              </div>
+
+              <div className="space-y-2 text-sm text-foreground">
+                {equipmentBonuses.specialAbilities.map((ability) => (
+                  <div
+                    key={`${ability.itemId}-${ability.description}`}
+                    className="rounded bg-background/25 px-2.5 py-2"
+                  >
+                    <span className="font-medium text-gold/90">
+                      {ability.itemName}:
+                    </span>{" "}
+                    <span>{ability.description}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
 
         {/* Notes */}

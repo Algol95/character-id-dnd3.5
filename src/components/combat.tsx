@@ -83,6 +83,7 @@ export function Combat({
   const touchACTotal = character.touchAC + equipmentBonuses.touchAC;
   const flatFootedACTotal =
     character.flatFootedAC + equipmentBonuses.flatFootedAC;
+  const speedTotal = character.speed + equipmentBonuses.speed;
 
   return (
     <SectionShell title="COMBATE" isOpen={isOpen} onToggle={onToggle}>
@@ -303,6 +304,15 @@ export function Combat({
                 />
                 <span className="text-sm text-muted-foreground">pies</span>
               </div>
+            </div>
+
+            <div className="mt-2 text-sm text-gold">
+              Total {speedTotal} pies
+              {equipmentBonuses.speed !== 0 ? (
+                <span className="ml-2 text-xs text-gold/75">
+                  Equipo {formatModifier(equipmentBonuses.speed)}
+                </span>
+              ) : null}
             </div>
           </div>
 

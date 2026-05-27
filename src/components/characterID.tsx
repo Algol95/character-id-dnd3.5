@@ -114,6 +114,14 @@ function parseDamageRoll(damageString: string): ParsedDamageRoll | null {
   };
 }
 
+function sanitizeCharacterData(character: CharacterData): CharacterData {
+  return {
+    ...character,
+    equippedItems: character.equippedItems.filter(
+      (item) => item.slot !== "ammunition",
+    ),
+  };
+}
 /**
  * Agrupa la presentacion visual comun de cada columna principal del panel.
  */
@@ -154,10 +162,12 @@ function PanelSection({
  */
 export function CharacterId() {
   const [character, setCharacter] = useState<CharacterData>(() =>
-    readStoredState(
-      STORAGE_KEY,
-      DEFAULT_CHARACTER,
-      "[v0] Failed to load character:",
+    sanitizeCharacterData(
+      readStoredState(
+        STORAGE_KEY,
+        DEFAULT_CHARACTER,
+        "[v0] Failed to load character:",
+      ),
     ),
   );
   const [rollLabel, setRollLabel] = useState("");
@@ -204,7 +214,7 @@ export function CharacterId() {
   }, [visibleSections]);
 
   const handleChange = useCallback((updates: Partial<CharacterData>) => {
-    setCharacter((prev) => ({ ...prev, ...updates }));
+    setCharacter((prev) => sanitizeCharacterData({ ...prev, ...updates }));
   }, []);
 
   const toggleSection = useCallback((section: SectionKey) => {
@@ -301,7 +311,9 @@ export function CharacterId() {
     reader.onload = (event) => {
       try {
         const parsed = JSON.parse(event.target?.result as string);
-        setCharacter({ ...DEFAULT_CHARACTER, ...parsed });
+        setCharacter(
+          sanitizeCharacterData({ ...DEFAULT_CHARACTER, ...parsed }),
+        );
       } catch {
         alert("No se pudo interpretar el archivo del personaje");
       }
@@ -370,15 +382,6 @@ export function CharacterId() {
                   onToggle={() => toggleSection("saves")}
                 />
 
-                <Attacks
-                  character={character}
-                  onChange={handleChange}
-                  onRollAttack={handleNamedRoll}
-                  onRollDamage={handleDamageRoll}
-                  isOpen={visibleSections.attacks}
-                  onToggle={() => toggleSection("attacks")}
-                />
-
                 <EquippedGear
                   character={character}
                   onChange={handleChange}
@@ -391,6 +394,15 @@ export function CharacterId() {
                   onChange={handleChange}
                   isOpen={visibleSections.equipment}
                   onToggle={() => toggleSection("equipment")}
+                />
+
+                <Attacks
+                  character={character}
+                  onChange={handleChange}
+                  onRollAttack={handleNamedRoll}
+                  onRollDamage={handleDamageRoll}
+                  isOpen={visibleSections.attacks}
+                  onToggle={() => toggleSection("attacks")}
                 />
               </PanelSection>
 
@@ -417,6 +429,7 @@ export function CharacterId() {
 
                 <Feats
                   character={character}
+                  equipmentBonuses={equipmentBonuses}
                   onChange={handleChange}
                   isOpen={visibleSections.feats}
                   onToggle={() => toggleSection("feats")}
