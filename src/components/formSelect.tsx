@@ -32,9 +32,13 @@ interface MenuPosition {
   top: number;
   left: number;
   width: number;
+  maxHeight: number;
 }
 
 const MIN_MENU_WIDTH = 220;
+const MENU_VIEWPORT_MARGIN = 12;
+const MENU_OFFSET = 8;
+const MAX_MENU_HEIGHT = 288;
 
 /**
  * Select personalizado reutilizable para evitar los desplegables nativos sin estilo.
@@ -73,10 +77,35 @@ export function FormSelect({
         return;
       }
 
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const desiredWidth = Math.max(rect.width, MIN_MENU_WIDTH);
+      const left = Math.min(
+        Math.max(MENU_VIEWPORT_MARGIN, rect.left),
+        viewportWidth - desiredWidth - MENU_VIEWPORT_MARGIN,
+      );
+      const availableBelow =
+        viewportHeight - rect.bottom - MENU_VIEWPORT_MARGIN;
+      const availableAbove = rect.top - MENU_VIEWPORT_MARGIN;
+      const shouldOpenUpward =
+        availableBelow < 200 && availableAbove > availableBelow;
+      const maxHeight = Math.max(
+        140,
+        Math.min(
+          MAX_MENU_HEIGHT,
+          shouldOpenUpward
+            ? availableAbove - MENU_OFFSET
+            : availableBelow - MENU_OFFSET,
+        ),
+      );
+
       setMenuPosition({
-        top: rect.bottom + 8,
-        left: rect.left,
-        width: Math.max(rect.width, MIN_MENU_WIDTH),
+        top: shouldOpenUpward
+          ? Math.max(MENU_VIEWPORT_MARGIN, rect.top - maxHeight - MENU_OFFSET)
+          : rect.bottom + MENU_OFFSET,
+        left,
+        width: desiredWidth,
+        maxHeight,
       });
     };
 
@@ -190,7 +219,10 @@ export function FormSelect({
             >
               <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(120deg,transparent_0%,rgba(255,255,255,0.18)_45%,transparent_100%),radial-gradient(circle_at_20%_10%,rgba(212,175,55,0.22),transparent_25%)] opacity-10" />
 
-              <div className="relative z-10 max-h-72 overflow-y-auto pr-1">
+              <div
+                className="relative z-10 overflow-y-auto pr-1"
+                style={{ maxHeight: menuPosition.maxHeight }}
+              >
                 {options.map((option) => {
                   const isSelected = option.value === value;
 

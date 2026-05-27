@@ -19,7 +19,14 @@ import { Feats } from "./feats";
 import { DiceRoller } from "./diceRoller";
 import { Header } from "./header";
 import { Footer } from "./footer";
-import { DEFAULT_CHARACTER, type CharacterData } from "@/lib/character-types";
+import {
+  DEFAULT_CHARACTER,
+  formatModifier,
+  type Attack,
+  type CharacterData,
+  type EquippedItem,
+  type WeaponProfile,
+} from "@/lib/character-types";
 import { computeEquipmentBonuses } from "@/lib/equipment-effects";
 
 const STORAGE_KEY = "dnd35-character-sheet";
@@ -64,6 +71,10 @@ interface PanelSectionProps {
   sticky?: boolean;
   children: ReactNode;
 }
+
+type StoredEquippedItem = EquippedItem & Partial<WeaponProfile>;
+
+const OFFICIAL_DAMAGE_DICE_TYPES = new Set([4, 6, 8, 10, 12]);
 
 function readStoredState<T extends object>(
   storageKey: string,
@@ -114,12 +125,186 @@ function parseDamageRoll(damageString: string): ParsedDamageRoll | null {
   };
 }
 
+type LegacyStoredAttack = {
+  name?: string;
+  attackBonus?: number;
+  damage?: string;
+  critical?: string;
+  range?: string;
+  type?: string;
+  notes?: string;
+};
+
+function createBattleActionId(prefix = "battle") {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return `${prefix}-${crypto.randomUUID()}`;
+  }
+
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function parseLegacyCritical(critical?: string) {
+  if (!critical) {
+    return { criticalRangeStart: 20, criticalMultiplier: 2 };
+  }
+
+  const criticalMatch = critical.match(/(?:(\d+)-20|20)?\s*\/?\s*x?(\d+)/i);
+
+  if (!criticalMatch) {
+    return { criticalRangeStart: 20, criticalMultiplier: 2 };
+  }
+
+  return {
+    criticalRangeStart: criticalMatch[1]
+      ? Number.parseInt(criticalMatch[1], 10)
+      : 20,
+    criticalMultiplier: Number.parseInt(criticalMatch[2], 10) || 2,
+  };
+}
+
+function migrateLegacyAttack(legacyAttack: LegacyStoredAttack): Attack {
+  const parsedDamage = parseDamageRoll(legacyAttack.damage?.trim() ?? "");
+  const critical = parseLegacyCritical(legacyAttack.critical);
+  const legacyNotes = [
+    legacyAttack.range,
+    legacyAttack.type,
+    legacyAttack.notes,
+  ]
+    .map((value) => value?.trim())
+    .filter(Boolean)
+    .join(" | ");
+
+  return {
+    id: createBattleActionId(),
+    name: legacyAttack.name?.trim() || "Ataque heredado",
+    actionType: "weapon",
+    notes: legacyNotes,
+    weaponConfig: {
+      source: "improvised",
+      weaponSnapshot: {
+        name: legacyAttack.name?.trim() || "Arma heredada",
+        damageDiceCount: parsedDamage?.numDice ?? 1,
+        damageDiceType: parsedDamage?.diceType ?? 6,
+        criticalRangeStart: critical.criticalRangeStart,
+        criticalMultiplier: critical.criticalMultiplier,
+      },
+      attackModifiers:
+        typeof legacyAttack.attackBonus === "number" &&
+        legacyAttack.attackBonus !== 0
+          ? [
+              {
+                id: createBattleActionId("modifier"),
+                source: "custom",
+                customLabel: "Ataque legado",
+                customValue: legacyAttack.attackBonus,
+              },
+            ]
+          : [],
+      damageModifiers:
+        parsedDamage && parsedDamage.modifier !== 0
+          ? [
+              {
+                id: createBattleActionId("modifier"),
+                source: "custom",
+                customLabel: "Dano legado",
+                customValue: parsedDamage.modifier,
+              },
+            ]
+          : [],
+    },
+  };
+}
+
+function normalizeStoredAttack(
+  storedAttack: Attack | LegacyStoredAttack,
+): Attack {
+  if ("actionType" in storedAttack) {
+    const legacySpellExpression =
+      storedAttack.spellConfig && "rollExpression" in storedAttack.spellConfig
+        ? typeof storedAttack.spellConfig.rollExpression === "string"
+          ? storedAttack.spellConfig.rollExpression
+          : ""
+        : "";
+    const normalizedSpellConfig = storedAttack.spellConfig
+      ? "rollExpression" in storedAttack.spellConfig
+        ? {
+            damageDiceCount:
+              parseDamageRoll(legacySpellExpression)?.numDice ?? 1,
+            damageDiceType:
+              parseDamageRoll(legacySpellExpression)?.diceType ?? 6,
+            effectModifiers: storedAttack.spellConfig.effectModifiers ?? [],
+          }
+        : {
+            damageDiceCount: Math.max(
+              1,
+              storedAttack.spellConfig.damageDiceCount ?? 1,
+            ),
+            damageDiceType: storedAttack.spellConfig.damageDiceType ?? 6,
+            effectModifiers: storedAttack.spellConfig.effectModifiers ?? [],
+          }
+      : undefined;
+
+    return {
+      ...storedAttack,
+      id: storedAttack.id || createBattleActionId(),
+      weaponConfig: storedAttack.weaponConfig
+        ? {
+            ...storedAttack.weaponConfig,
+            extraDamageDiceCount:
+              Math.max(0, storedAttack.weaponConfig.extraDamageDiceCount ?? 0),
+          }
+        : undefined,
+      spellConfig: normalizedSpellConfig,
+    };
+  }
+
+  return migrateLegacyAttack(storedAttack);
+}
+
+function normalizeStoredEquippedItem(item: StoredEquippedItem): EquippedItem {
+  const shouldTreatAsWeapon =
+    Boolean(item.weaponProfile) || item.category === "weapon" || item.slot === "ranged";
+  const legacyWeaponProfile = item.weaponProfile ??
+    (shouldTreatAsWeapon
+      ? {
+          damageDiceCount: item.damageDiceCount,
+          damageDiceType: item.damageDiceType,
+          criticalRangeStart: item.criticalRangeStart,
+          criticalMultiplier: item.criticalMultiplier,
+        }
+      : undefined);
+  const normalizedDamageDiceType =
+    legacyWeaponProfile?.damageDiceType &&
+    OFFICIAL_DAMAGE_DICE_TYPES.has(legacyWeaponProfile.damageDiceType)
+      ? legacyWeaponProfile.damageDiceType
+      : 8;
+
+  return {
+    ...item,
+    category: item.slot === "ranged" ? "weapon" : item.category,
+    description: item.description ?? "",
+    effects: item.effects ?? [],
+    weaponProfile: shouldTreatAsWeapon
+      ? {
+          damageDiceCount: Math.max(1, legacyWeaponProfile?.damageDiceCount ?? 1),
+          damageDiceType: normalizedDamageDiceType,
+          criticalRangeStart: Math.min(
+            20,
+            Math.max(1, legacyWeaponProfile?.criticalRangeStart ?? 20),
+          ),
+          criticalMultiplier: Math.max(2, legacyWeaponProfile?.criticalMultiplier ?? 2),
+        }
+      : undefined,
+  };
+}
+
 function sanitizeCharacterData(character: CharacterData): CharacterData {
   return {
     ...character,
-    equippedItems: character.equippedItems.filter(
-      (item) => item.slot !== "ammunition",
-    ),
+    attacks: character.attacks.map(normalizeStoredAttack),
+    equippedItems: character.equippedItems
+      .filter((item) => item.slot !== "ammunition")
+      .map((item) => normalizeStoredEquippedItem(item as StoredEquippedItem)),
   };
 }
 /**
@@ -238,10 +423,25 @@ export function CharacterId() {
   );
 
   const handleNamedRoll = useCallback(
-    (label: string, modifiers: RollModifier[]) => {
-      handleRoll(label, modifiers);
+    (label: string, modifiers: RollModifier[], diceCount = 1) => {
+      if (diceCount <= 1) {
+        handleRoll(label, modifiers);
+        return;
+      }
+
+      const attackRolls = Array.from(
+        { length: diceCount },
+        () => Math.floor(Math.random() * 20) + 1,
+      );
+
+      setRollLabel(`${label} (${diceCount} ataques)`);
+      rollDice(20, modifiers, {
+        highlightOutcome: false,
+        presetRolls: attackRolls,
+        selectedRollIndex: 0,
+      });
     },
-    [handleRoll],
+    [handleRoll, rollDice],
   );
 
   const handleAbilityRoll = useCallback(
@@ -259,35 +459,71 @@ export function CharacterId() {
   );
 
   const handleDamageRoll = useCallback(
-    (attackName: string, damageString: string) => {
-      const parsedDamageRoll = parseDamageRoll(damageString);
+    (
+      attackName: string,
+      damageConfig: {
+        diceCount: number;
+        diceType: number;
+        totalBonus: number;
+        perDieBonus: number;
+        baseMultiplier?: number;
+      },
+    ) => {
+      const {
+        diceCount,
+        diceType,
+        totalBonus,
+        perDieBonus,
+        baseMultiplier = 1,
+      } = damageConfig;
 
-      if (!parsedDamageRoll) {
-        setRollLabel(`${attackName} Dano`);
-        rollDice(6, []);
-        return;
-      }
+      const baseRolls = Array.from(
+        { length: diceCount },
+        () => Math.floor(Math.random() * diceType) + 1,
+      );
+      const selectedRollIndex = 0;
+      const baseTotal = baseRolls.reduce((sum, roll) => sum + roll, 0);
+      const remainingBaseRolls =
+        baseTotal - (baseRolls[selectedRollIndex] ?? 0);
+      const criticalExtra =
+        baseMultiplier > 1 ? baseTotal * (baseMultiplier - 1) : 0;
+      const perDieExtra = perDieBonus * diceCount;
+      const expression = `${diceCount}d${diceType}`;
 
-      const { numDice, diceType, modifier } = parsedDamageRoll;
-
-      let total = 0;
-      for (let i = 0; i < numDice; i++) {
-        const roll = Math.floor(Math.random() * diceType) + 1;
-        total += roll;
-      }
-
-      setRollLabel(`${attackName} Dano (${damageString})`);
+      setRollLabel(
+        `${attackName} Dano (${expression}${baseMultiplier > 1 ? `, crit x${baseMultiplier}` : ""})`,
+      );
 
       const modifiers = [
-        { label: `${numDice}d${diceType}`, value: total },
-        ...(modifier !== 0 ? [{ label: "Mod.", value: modifier }] : []),
+        ...(remainingBaseRolls !== 0
+          ? [
+              {
+                label: `${diceCount - 1}d${diceType}`,
+                value: remainingBaseRolls,
+              },
+            ]
+          : []),
+        ...(criticalExtra !== 0
+          ? [{ label: `Critico x${baseMultiplier}`, value: criticalExtra }]
+          : []),
+        ...(perDieExtra !== 0
+          ? [
+              {
+                label: `${formatModifier(perDieBonus)} por dado`,
+                value: perDieExtra,
+              },
+            ]
+          : []),
+        ...(totalBonus !== 0
+          ? [{ label: "Bono total", value: totalBonus }]
+          : []),
       ];
 
-      rollDice(
-        1,
-        modifiers.map((m, i) => (i === 0 ? { ...m, value: m.value - 1 } : m)),
-        { highlightOutcome: false },
-      );
+      rollDice(diceType, modifiers, {
+        highlightOutcome: false,
+        presetRolls: baseRolls,
+        selectedRollIndex,
+      });
     },
     [rollDice],
   );

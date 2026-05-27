@@ -10,6 +10,8 @@ export type DiceRollMode = "normal" | "advantage" | "disadvantage";
 export interface DiceRollOptions {
   mode?: DiceRollMode;
   highlightOutcome?: boolean;
+  presetRolls?: number[];
+  selectedRollIndex?: number;
 }
 
 export interface DiceRollResult {
@@ -58,22 +60,29 @@ export function useDiceRoller() {
         const rollMode = options.mode ?? "normal";
         const highlightOutcome = options.highlightOutcome ?? true;
         const rolls =
-          rollMode === "normal"
-            ? [Math.floor(Math.random() * diceType) + 1]
-            : [
-                Math.floor(Math.random() * diceType) + 1,
-                Math.floor(Math.random() * diceType) + 1,
-              ];
+          options.presetRolls && options.presetRolls.length > 0
+            ? [...options.presetRolls]
+            : rollMode === "normal"
+              ? [Math.floor(Math.random() * diceType) + 1]
+              : [
+                  Math.floor(Math.random() * diceType) + 1,
+                  Math.floor(Math.random() * diceType) + 1,
+                ];
         const selectedRollIndex =
-          rollMode === "advantage"
-            ? rolls[0] >= rolls[1]
-              ? 0
-              : 1
-            : rollMode === "disadvantage"
-              ? rolls[0] <= rolls[1]
+          options.presetRolls && options.presetRolls.length > 0
+            ? Math.min(
+                Math.max(options.selectedRollIndex ?? 0, 0),
+                rolls.length - 1,
+              )
+            : rollMode === "advantage"
+              ? rolls[0] >= rolls[1]
                 ? 0
                 : 1
-              : 0;
+              : rollMode === "disadvantage"
+                ? rolls[0] <= rolls[1]
+                  ? 0
+                  : 1
+                : 0;
         const roll = rolls[selectedRollIndex];
         const modifierTotal = modifiers.reduce(
           (sum, modifier) => sum + modifier.value,

@@ -146,6 +146,15 @@ export function doesItemOccupyOffHand(item: EquippedItem): boolean {
   );
 }
 
+export function isEquippedWeaponCandidate(item: EquippedItem): boolean {
+  return (
+    Boolean(item.weaponProfile) ||
+    item.category === "weapon" ||
+    item.slot === "mainHand" ||
+    item.slot === "ranged"
+  );
+}
+
 export function computeEquipmentBonuses(
   character: CharacterData,
 ): EquipmentBonuses {

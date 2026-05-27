@@ -1,13 +1,3 @@
-export interface Attack {
-  name: string;
-  attackBonus: number;
-  damage: string;
-  critical: string;
-  range: string;
-  type: string;
-  notes: string;
-}
-
 export interface Skill {
   name: string;
   ability: "STR" | "DEX" | "CON" | "INT" | "WIS" | "CHA";
@@ -84,6 +74,52 @@ export interface WeaponProfile {
   damageDiceType: number;
   criticalRangeStart: number;
   criticalMultiplier: number;
+}
+
+export type BattleActionType = "weapon" | "spell";
+
+export type BattleActionModifierSource =
+  | AbilityScoreField
+  | "baseAttackBonus"
+  | "initiative"
+  | "custom";
+
+export type BattleActionModifierApplication = "total" | "perDie";
+
+export interface BattleActionModifier {
+  id: string;
+  source: BattleActionModifierSource;
+  application?: BattleActionModifierApplication;
+  customLabel?: string;
+  customValue?: number;
+}
+
+export interface BattleActionWeaponSnapshot extends WeaponProfile {
+  name: string;
+}
+
+export interface WeaponAttackConfig {
+  source: "equipped" | "improvised";
+  selectedWeaponId?: string;
+  weaponSnapshot: BattleActionWeaponSnapshot;
+  extraDamageDiceCount?: number;
+  attackModifiers: BattleActionModifier[];
+  damageModifiers: BattleActionModifier[];
+}
+
+export interface SpellAttackConfig {
+  damageDiceCount: number;
+  damageDiceType: number;
+  effectModifiers: BattleActionModifier[];
+}
+
+export interface Attack {
+  id: string;
+  name: string;
+  actionType: BattleActionType;
+  notes: string;
+  weaponConfig?: WeaponAttackConfig;
+  spellConfig?: SpellAttackConfig;
 }
 
 export interface EquippedItem {
