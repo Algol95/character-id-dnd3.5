@@ -140,7 +140,8 @@ export function Attacks({
     if (config.source === "equipped" && config.selectedWeaponId) {
       const equippedWeapon = character.equippedItems.find(
         (item) =>
-          item.id === config.selectedWeaponId && isEquippedWeaponCandidate(item),
+          item.id === config.selectedWeaponId &&
+          isEquippedWeaponCandidate(item),
       );
 
       if (equippedWeapon) {
@@ -340,7 +341,8 @@ export function Attacks({
             const spellBonusSummary = summarizeModifiers(
               attack.spellConfig?.effectModifiers ?? [],
             );
-            const effectiveWeaponDiceCount = getEffectiveWeaponDiceCount(attack);
+            const effectiveWeaponDiceCount =
+              getEffectiveWeaponDiceCount(attack);
             const criticalRange = weaponSnapshot
               ? weaponSnapshot.criticalRangeStart >= 20
                 ? "20"
@@ -369,8 +371,7 @@ export function Attacks({
                       {attack.actionType === "weapon" && weaponSnapshot ? (
                         <>
                           <div>
-                            {weaponSnapshot.name} ·{" "}
-                            {effectiveWeaponDiceCount}d
+                            {weaponSnapshot.name} · {effectiveWeaponDiceCount}d
                             {weaponSnapshot.damageDiceType} · Critico{" "}
                             {criticalRange}/x{weaponSnapshot.criticalMultiplier}
                           </div>
@@ -378,8 +379,8 @@ export function Attacks({
                             Ataque {formatModifier(attackBonusTotal)}
                             {effectiveWeaponDiceCount > 1
                               ? ` x${effectiveWeaponDiceCount}`
-                              : ""} · Dano{" "}
-                            {getWeaponDamageExpression(attack)}
+                              : ""}{" "}
+                            · Dano {getWeaponDamageExpression(attack)}
                             {damageBonusSummary.total !== 0 ||
                             damageBonusSummary.perDie !== 0
                               ? ` (${formatModifierSummary(

@@ -250,8 +250,10 @@ function normalizeStoredAttack(
       weaponConfig: storedAttack.weaponConfig
         ? {
             ...storedAttack.weaponConfig,
-            extraDamageDiceCount:
-              Math.max(0, storedAttack.weaponConfig.extraDamageDiceCount ?? 0),
+            extraDamageDiceCount: Math.max(
+              0,
+              storedAttack.weaponConfig.extraDamageDiceCount ?? 0,
+            ),
           }
         : undefined,
       spellConfig: normalizedSpellConfig,
@@ -263,8 +265,11 @@ function normalizeStoredAttack(
 
 function normalizeStoredEquippedItem(item: StoredEquippedItem): EquippedItem {
   const shouldTreatAsWeapon =
-    Boolean(item.weaponProfile) || item.category === "weapon" || item.slot === "ranged";
-  const legacyWeaponProfile = item.weaponProfile ??
+    Boolean(item.weaponProfile) ||
+    item.category === "weapon" ||
+    item.slot === "ranged";
+  const legacyWeaponProfile =
+    item.weaponProfile ??
     (shouldTreatAsWeapon
       ? {
           damageDiceCount: item.damageDiceCount,
@@ -286,13 +291,19 @@ function normalizeStoredEquippedItem(item: StoredEquippedItem): EquippedItem {
     effects: item.effects ?? [],
     weaponProfile: shouldTreatAsWeapon
       ? {
-          damageDiceCount: Math.max(1, legacyWeaponProfile?.damageDiceCount ?? 1),
+          damageDiceCount: Math.max(
+            1,
+            legacyWeaponProfile?.damageDiceCount ?? 1,
+          ),
           damageDiceType: normalizedDamageDiceType,
           criticalRangeStart: Math.min(
             20,
             Math.max(1, legacyWeaponProfile?.criticalRangeStart ?? 20),
           ),
-          criticalMultiplier: Math.max(2, legacyWeaponProfile?.criticalMultiplier ?? 2),
+          criticalMultiplier: Math.max(
+            2,
+            legacyWeaponProfile?.criticalMultiplier ?? 2,
+          ),
         }
       : undefined,
   };
