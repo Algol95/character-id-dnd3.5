@@ -34,6 +34,7 @@ const SECTION_VISIBILITY_KEY = "dnd35-section-visibility";
 
 type SaveStatus = "saved" | "saving" | "error";
 type RollModifier = { label: string; value: number };
+type WeaponCriticalStateMap = Record<string, number[]>;
 
 type SectionKey =
   | "basicInfo"
@@ -383,6 +384,8 @@ export function CharacterId() {
 
   const { isRolling, result, showResult, rollDice, closeResult } =
     useDiceRoller();
+  const [weaponCriticalStates, setWeaponCriticalStates] =
+    useState<WeaponCriticalStateMap>({});
   const equipmentBonuses = useMemo(
     () => computeEquipmentBonuses(character),
     [character],
@@ -438,11 +441,24 @@ export function CharacterId() {
 
   const handleNamedRoll = useCallback(
     (
+      actionId: string | undefined,
       label: string,
       modifiers: RollModifier[],
       diceCount = 1,
       criticalThreatRangeStart?: number,
     ) => {
+      if (actionId) {
+        setWeaponCriticalStates((currentStates) => {
+          if (!(actionId in currentStates)) {
+            return currentStates;
+          }
+
+          const nextStates = { ...currentStates };
+          delete nextStates[actionId];
+          return nextStates;
+        });
+      }
+
       if (diceCount <= 1 && criticalThreatRangeStart === undefined) {
         handleRoll(label, modifiers);
         return;
@@ -463,11 +479,68 @@ export function CharacterId() {
         presetRolls: attackRolls,
         chipValues: attackRolls.map((roll) => roll + modifierTotal),
         criticalThreatRangeStart,
+        actionId,
         selectedRollIndex: 0,
       });
     },
     [handleRoll, rollDice],
   );
+
+  const handleNamedRollSimple = useCallback(
+    (label: string, modifiers: RollModifier[]) => {
+      handleNamedRoll(undefined, label, modifiers);
+    },
+    [handleNamedRoll],
+  );
+
+  const handleAttackCriticalStateChange = useCallback(
+    (actionId: string, criticalAttackIndexes: number[]) => {
+      setWeaponCriticalStates((currentStates) => {
+        const normalizedIndexes = [...new Set(criticalAttackIndexes)].sort(
+          (left, right) => left - right,
+        );
+
+        if (normalizedIndexes.length === 0) {
+          if (!(actionId in currentStates)) {
+            return currentStates;
+          }
+
+          const nextStates = { ...currentStates };
+          delete nextStates[actionId];
+          return nextStates;
+        }
+
+        const previousIndexes = currentStates[actionId] ?? [];
+        const isSameState =
+          previousIndexes.length === normalizedIndexes.length &&
+          previousIndexes.every(
+            (value, index) => value === normalizedIndexes[index],
+          );
+
+        if (isSameState) {
+          return currentStates;
+        }
+
+        return {
+          ...currentStates,
+          [actionId]: normalizedIndexes,
+        };
+      });
+    },
+    [],
+  );
+
+  const handleResetWeaponCriticalState = useCallback((actionId: string) => {
+    setWeaponCriticalStates((currentStates) => {
+      if (!(actionId in currentStates)) {
+        return currentStates;
+      }
+
+      const nextStates = { ...currentStates };
+      delete nextStates[actionId];
+      return nextStates;
+    });
+  }, []);
 
   const handleAbilityRoll = useCallback(
     (label: string, modifier: number) => {
@@ -492,6 +565,7 @@ export function CharacterId() {
         totalBonus: number;
         perDieBonus: number;
         baseMultiplier?: number;
+        damageGroups?: { diceCount: number; baseMultiplier?: number }[];
       },
     ) => {
       const {
@@ -500,36 +574,96 @@ export function CharacterId() {
         totalBonus,
         perDieBonus,
         baseMultiplier = 1,
+        damageGroups,
       } = damageConfig;
 
-      const baseRolls = Array.from(
-        { length: diceCount },
-        () => Math.floor(Math.random() * diceType) + 1,
+      const resolvedDamageGroups =
+        damageGroups && damageGroups.length > 0
+          ? damageGroups.map((group) => ({
+              diceCount: Math.max(1, group.diceCount),
+              baseMultiplier: Math.max(1, group.baseMultiplier ?? 1),
+            }))
+          : [
+              {
+                diceCount: Math.max(1, diceCount),
+                baseMultiplier: Math.max(1, baseMultiplier),
+              },
+            ];
+
+      const groupedBaseRolls = resolvedDamageGroups.map((group) =>
+        Array.from(
+          { length: group.diceCount },
+          () => Math.floor(Math.random() * diceType) + 1,
+        ),
       );
+      const baseRolls = groupedBaseRolls.flat();
       const selectedRollIndex = 0;
-      const baseTotal = baseRolls.reduce((sum, roll) => sum + roll, 0);
+      const baseDiceCount = baseRolls.length;
       const remainingBaseRolls =
-        baseTotal - (baseRolls[selectedRollIndex] ?? 0);
-      const criticalExtra =
-        baseMultiplier > 1 ? baseTotal * (baseMultiplier - 1) : 0;
-      const perDieExtra = perDieBonus * diceCount;
-      const expression = `${diceCount}d${diceType}`;
+        baseRolls.reduce((sum, roll) => sum + roll, 0) -
+        (baseRolls[selectedRollIndex] ?? 0);
+      const criticalExtra = resolvedDamageGroups.reduce(
+        (extraTotal, group, index) => {
+          if (group.baseMultiplier <= 1) {
+            return extraTotal;
+          }
+
+          const groupTotal = groupedBaseRolls[index].reduce(
+            (sum, roll) => sum + roll,
+            0,
+          );
+
+          return extraTotal + groupTotal * (group.baseMultiplier - 1);
+        },
+        0,
+      );
+      const criticalGroups = resolvedDamageGroups.filter(
+        (group) => group.baseMultiplier > 1,
+      );
+      const chipMetadata = groupedBaseRolls.flatMap(
+        (groupRolls, groupIndex) => {
+          const groupMultiplier = Math.max(
+            1,
+            resolvedDamageGroups[groupIndex]?.baseMultiplier ?? 1,
+          );
+          const isCriticalGroup = groupMultiplier > 1;
+
+          return groupRolls.map((roll) => ({
+            value: roll * groupMultiplier + perDieBonus,
+            tone: isCriticalGroup
+              ? ("critical" as const)
+              : ("default" as const),
+          }));
+        },
+      );
+      const perDieExtra = perDieBonus * baseDiceCount;
+      const expression = `${baseDiceCount}d${diceType}`;
+      const hasCriticalGroups = criticalGroups.length > 0;
+      const isUniformCritical =
+        hasCriticalGroups &&
+        criticalGroups.length === resolvedDamageGroups.length &&
+        criticalGroups.every(
+          (group) => group.baseMultiplier === criticalGroups[0]?.baseMultiplier,
+        );
+      const criticalLabel = isUniformCritical
+        ? `Critico x${criticalGroups[0]?.baseMultiplier ?? 2}`
+        : "Critico parcial";
 
       setRollLabel(
-        `${attackName} Dano (${expression}${baseMultiplier > 1 ? `, crit x${baseMultiplier}` : ""})`,
+        `${attackName} Dano (${expression}${hasCriticalGroups ? `, ${isUniformCritical ? `crit x${criticalGroups[0]?.baseMultiplier ?? 2}` : "crit parcial"}` : ""})`,
       );
 
       const modifiers = [
         ...(remainingBaseRolls !== 0
           ? [
               {
-                label: `${diceCount - 1}d${diceType}`,
+                label: `${baseDiceCount - 1}d${diceType}`,
                 value: remainingBaseRolls,
               },
             ]
           : []),
         ...(criticalExtra !== 0
-          ? [{ label: `Critico x${baseMultiplier}`, value: criticalExtra }]
+          ? [{ label: criticalLabel, value: criticalExtra }]
           : []),
         ...(perDieExtra !== 0
           ? [
@@ -548,9 +682,12 @@ export function CharacterId() {
         highlightOutcome: false,
         presetRolls: baseRolls,
         chipValues:
-          perDieBonus !== 0
-            ? baseRolls.map((roll) => roll + perDieBonus)
+          perDieBonus !== 0 || hasCriticalGroups
+            ? chipMetadata.map((chip) => chip.value)
             : undefined,
+        chipTones: hasCriticalGroups
+          ? chipMetadata.map((chip) => chip.tone)
+          : undefined,
         selectedRollIndex,
       });
     },
@@ -642,7 +779,7 @@ export function CharacterId() {
                   character={character}
                   equipmentBonuses={equipmentBonuses}
                   onChange={handleChange}
-                  onRollSave={handleNamedRoll}
+                  onRollSave={handleNamedRollSimple}
                   isOpen={visibleSections.saves}
                   onToggle={() => toggleSection("saves")}
                 />
@@ -666,6 +803,8 @@ export function CharacterId() {
                   onChange={handleChange}
                   onRollAttack={handleNamedRoll}
                   onRollDamage={handleDamageRoll}
+                  weaponCriticalStates={weaponCriticalStates}
+                  onResetWeaponCriticalState={handleResetWeaponCriticalState}
                   isOpen={visibleSections.attacks}
                   onToggle={() => toggleSection("attacks")}
                 />
@@ -687,7 +826,7 @@ export function CharacterId() {
                   character={character}
                   equipmentBonuses={equipmentBonuses}
                   onChange={handleChange}
-                  onRollSkill={handleNamedRoll}
+                  onRollSkill={handleNamedRollSimple}
                   isOpen={visibleSections.skills}
                   onToggle={() => toggleSection("skills")}
                 />
@@ -714,6 +853,7 @@ export function CharacterId() {
         showResult={showResult}
         onClose={closeResult}
         rollLabel={rollLabel}
+        onAttackCriticalStateChange={handleAttackCriticalStateChange}
       />
     </div>
   );

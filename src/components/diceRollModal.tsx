@@ -55,6 +55,11 @@ interface CriticalConfirmationState {
   };
 }
 
+const EMPTY_CONFIRMATION_DECISIONS: Record<
+  number,
+  "confirmed" | "rejected" | null
+> = {};
+
 function rollDie(sides: number) {
   if (typeof crypto !== "undefined" && "getRandomValues" in crypto) {
     const values = new Uint32Array(1);
@@ -203,15 +208,16 @@ function CriticalConfirmationControl({
   isNaturalCritical,
   isThreatened,
   modifierTotal,
+  decision,
+  onDecisionChange,
 }: {
   isNaturalCritical: boolean;
   isThreatened: boolean;
   modifierTotal: number;
+  decision: "confirmed" | "rejected" | null;
+  onDecisionChange: (decision: "confirmed" | "rejected" | null) => void;
 }) {
   const [attemptCount, setAttemptCount] = useState(0);
-  const [confirmationDecision, setConfirmationDecision] = useState<
-    "confirmed" | "rejected" | null
-  >(null);
   const [confirmationState, setConfirmationState] =
     useState<CriticalConfirmationState | null>(null);
 
@@ -288,7 +294,7 @@ function CriticalConfirmationControl({
       <button
         type="button"
         onClick={() => {
-          setConfirmationDecision(null);
+          onDecisionChange(null);
           setConfirmationState({
             isRolling: true,
             previewRoll: rollDie(20),
@@ -333,19 +339,17 @@ function CriticalConfirmationControl({
 
               <div
                 className={`mt-1 grid w-full transition-all duration-300 ${
-                  confirmationDecision
-                    ? "grid-cols-2 gap-0"
-                    : "grid-cols-2 gap-2"
+                  decision ? "grid-cols-2 gap-0" : "grid-cols-2 gap-2"
                 }`}
               >
                 <button
                   type="button"
-                  onClick={() => setConfirmationDecision("confirmed")}
-                  disabled={confirmationDecision !== null}
+                  onClick={() => onDecisionChange("confirmed")}
+                  disabled={decision !== null}
                   className={`rounded-full border px-3 py-1 text-[10px] uppercase tracking-[0.16em] transition-all duration-300 ${
-                    confirmationDecision === "confirmed"
+                    decision === "confirmed"
                       ? "col-span-2 justify-self-center border-critical/45 bg-critical/14 text-critical shadow-[0_0_18px_color-mix(in_oklab,var(--critical)_28%,transparent)]"
-                      : confirmationDecision === "rejected"
+                      : decision === "rejected"
                         ? "pointer-events-none w-0 justify-self-start scale-90 overflow-hidden border-0 px-0 py-0 opacity-0"
                         : "border-border/60 bg-background/20 text-muted-foreground hover:border-critical/35 hover:text-critical"
                   }`}
@@ -355,12 +359,12 @@ function CriticalConfirmationControl({
 
                 <button
                   type="button"
-                  onClick={() => setConfirmationDecision("rejected")}
-                  disabled={confirmationDecision !== null}
+                  onClick={() => onDecisionChange("rejected")}
+                  disabled={decision !== null}
                   className={`rounded-full border px-3 py-1 text-[10px] uppercase tracking-[0.16em] transition-all duration-300 ${
-                    confirmationDecision === "rejected"
+                    decision === "rejected"
                       ? "col-span-2 justify-self-center border-fumble/45 bg-fumble/14 text-fumble shadow-[0_0_18px_color-mix(in_oklab,var(--fumble)_24%,transparent)]"
-                      : confirmationDecision === "confirmed"
+                      : decision === "confirmed"
                         ? "pointer-events-none w-0 justify-self-end scale-90 overflow-hidden border-0 px-0 py-0 opacity-0"
                         : "border-border/60 bg-background/20 text-muted-foreground hover:border-fumble/35 hover:text-fumble"
                   }`}
@@ -391,6 +395,10 @@ interface DiceRollModalProps {
   showResult: boolean;
   onClose: () => void;
   rollLabel: string;
+  onAttackCriticalStateChange?: (
+    actionId: string,
+    criticalAttackIndexes: number[],
+  ) => void;
 }
 
 /**
@@ -409,8 +417,17 @@ export function DiceRollModal({
   showResult,
   onClose,
   rollLabel,
+  onAttackCriticalStateChange,
 }: DiceRollModalProps) {
   const canCloseRef = useRef(false);
+  const [confirmationDecisionSession, setConfirmationDecisionSession] =
+    useState<{
+      key: string;
+      decisions: Record<number, "confirmed" | "rejected" | null>;
+    }>({
+      key: "",
+      decisions: {},
+    });
 
   useEffect(() => {
     if (showResult) {
@@ -442,11 +459,13 @@ export function DiceRollModal({
     };
   }, [showResult, isRolling, onClose]);
 
-  if (typeof document === "undefined" || !showResult) return null;
-
   const appearance = getResultAppearance(result);
   const hasMultipleRolls = (result?.rolls.length ?? 0) > 1;
-  const criticalConfirmationSessionKey = `${rollLabel}:${result?.diceType ?? 0}:${result?.selectedRollIndex ?? 0}:${result?.criticalThreatRangeStart ?? "none"}:${result?.rolls.join(",") ?? ""}`;
+  const criticalConfirmationSessionKey = `${rollLabel}:${result?.diceType ?? 0}:${result?.selectedRollIndex ?? 0}:${result?.criticalThreatRangeStart ?? "none"}:${result?.rollInstanceId ?? 0}:${result?.rolls.join(",") ?? ""}`;
+  const confirmationDecisions =
+    confirmationDecisionSession.key === criticalConfirmationSessionKey
+      ? confirmationDecisionSession.decisions
+      : EMPTY_CONFIRMATION_DECISIONS;
   const confirmationModifierTotal =
     result?.modifierBreakdown.reduce(
       (sum, modifier) => sum + modifier.value,
@@ -473,7 +492,80 @@ export function DiceRollModal({
   const isThreatenedRoll = (rollIndex: number) =>
     threatenedRollIndexes.includes(rollIndex);
 
+  const handleConfirmationDecisionChange = (
+    rollIndex: number,
+    decision: "confirmed" | "rejected" | null,
+  ) => {
+    setConfirmationDecisionSession((currentSession) => ({
+      key: criticalConfirmationSessionKey,
+      decisions: {
+        ...(currentSession.key === criticalConfirmationSessionKey
+          ? currentSession.decisions
+          : {}),
+        [rollIndex]: decision,
+      },
+    }));
+  };
+
+  useEffect(() => {
+    if (
+      !result?.actionId ||
+      result.diceType !== 20 ||
+      !onAttackCriticalStateChange
+    ) {
+      return;
+    }
+
+    const threatenedRollIndexes =
+      result.criticalThreatRangeStart !== undefined &&
+      result.criticalThreatRangeStart < 20
+        ? result.rolls.reduce<number[]>((indexes, rollValue, index) => {
+            if (
+              rollValue >= result.criticalThreatRangeStart! &&
+              rollValue < 20
+            ) {
+              indexes.push(index);
+            }
+
+            return indexes;
+          }, [])
+        : [];
+    const naturalCriticalIndexes = result.rolls.reduce<number[]>(
+      (indexes, rollValue, index) => {
+        if (rollValue === 20) {
+          indexes.push(index);
+        }
+
+        return indexes;
+      },
+      [],
+    );
+    const confirmedThreatIndexes = threatenedRollIndexes.filter(
+      (rollIndex) => confirmationDecisions[rollIndex] === "confirmed",
+    );
+    const criticalAttackIndexes = [
+      ...new Set([...naturalCriticalIndexes, ...confirmedThreatIndexes]),
+    ].sort((left, right) => left - right);
+
+    onAttackCriticalStateChange(result.actionId, criticalAttackIndexes);
+  }, [
+    confirmationDecisions,
+    onAttackCriticalStateChange,
+    result?.actionId,
+    result?.criticalThreatRangeStart,
+    result?.diceType,
+    result?.rolls,
+  ]);
+
+  if (typeof document === "undefined" || !showResult) return null;
+
   const getRollChipTone = (rollIndex: number) => {
+    const explicitTone = result?.chipTones?.[rollIndex];
+
+    if (explicitTone) {
+      return explicitTone;
+    }
+
     const currentRoll = result?.rolls[rollIndex] ?? 0;
     const diceType = result?.diceType ?? 0;
 
@@ -503,6 +595,10 @@ export function DiceRollModal({
         isNaturalCritical={isNaturalCriticalRoll(rollIndex)}
         isThreatened={isThreatenedRoll(rollIndex)}
         modifierTotal={confirmationModifierTotal}
+        decision={confirmationDecisions[rollIndex] ?? null}
+        onDecisionChange={(decision) =>
+          handleConfirmationDecisionChange(rollIndex, decision)
+        }
       />
     );
   };

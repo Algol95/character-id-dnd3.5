@@ -13,7 +13,9 @@ export interface DiceRollOptions {
   presetRolls?: number[];
   selectedRollIndex?: number;
   chipValues?: number[];
+  chipTones?: Array<"default" | "critical" | "fumble">;
   criticalThreatRangeStart?: number;
+  actionId?: string;
 }
 
 export interface DiceRollResult {
@@ -22,7 +24,10 @@ export interface DiceRollResult {
   diceType: number;
   rolls: number[];
   chipValues?: number[];
+  chipTones?: Array<"default" | "critical" | "fumble">;
   criticalThreatRangeStart?: number;
+  actionId?: string;
+  rollInstanceId: number;
   selectedRollIndex: number;
   rollMode: DiceRollMode;
   modifierBreakdown: DiceModifier[];
@@ -35,6 +40,7 @@ export function useDiceRoller() {
   const [showResult, setShowResult] = useState(false);
   const [result, setResult] = useState<DiceRollResult | null>(null);
   const timersRef = useRef<number[]>([]);
+  const rollInstanceRef = useRef(0);
 
   const clearTimers = useCallback(() => {
     timersRef.current.forEach((timerId) => window.clearTimeout(timerId));
@@ -92,6 +98,7 @@ export function useDiceRoller() {
           (sum, modifier) => sum + modifier.value,
           0,
         );
+        rollInstanceRef.current += 1;
 
         setResult({
           roll,
@@ -102,7 +109,13 @@ export function useDiceRoller() {
             options.chipValues && options.chipValues.length === rolls.length
               ? [...options.chipValues]
               : undefined,
+          chipTones:
+            options.chipTones && options.chipTones.length === rolls.length
+              ? [...options.chipTones]
+              : undefined,
           criticalThreatRangeStart: options.criticalThreatRangeStart,
+          actionId: options.actionId,
+          rollInstanceId: rollInstanceRef.current,
           selectedRollIndex,
           rollMode,
           modifierBreakdown: modifiers,

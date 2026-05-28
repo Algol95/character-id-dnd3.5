@@ -18,6 +18,7 @@ interface AttacksProps {
   character: CharacterData;
   onChange: (updates: Partial<CharacterData>) => void;
   onRollAttack: (
+    actionId: string | undefined,
     attackName: string,
     modifiers: { label: string; value: number }[],
     diceCount?: number,
@@ -31,8 +32,11 @@ interface AttacksProps {
       totalBonus: number;
       perDieBonus: number;
       baseMultiplier?: number;
+      damageGroups?: { diceCount: number; baseMultiplier?: number }[];
     },
   ) => void;
+  weaponCriticalStates: Record<string, number[]>;
+  onResetWeaponCriticalState: (actionId: string) => void;
   isOpen?: boolean;
   onToggle?: () => void;
 }
@@ -47,13 +51,15 @@ function MacroActionButton({
   onClick: () => void;
   title: string;
   label: string;
-  tone?: "accent" | "critical";
+  tone?: "accent" | "critical" | "success";
   children: ReactNode;
 }) {
   const toneClasses =
     tone === "critical"
       ? "border-blood-red/45 bg-blood-red/12 text-blood-red hover:bg-blood-red/22 hover:shadow-[0_0_10px_rgba(153,27,27,0.32)]"
-      : "border-accent/50 bg-accent/20 text-accent hover:border-accent hover:bg-accent/40 hover:shadow-[0_0_10px_var(--accent)]";
+      : tone === "success"
+        ? "border-critical/50 bg-critical/12 text-critical hover:bg-critical/18 hover:shadow-[0_0_12px_color-mix(in_oklab,var(--critical)_35%,transparent)]"
+        : "border-accent/50 bg-accent/20 text-accent hover:border-accent hover:bg-accent/40 hover:shadow-[0_0_10px_var(--accent)]";
 
   return (
     <div className="flex flex-col items-center gap-1">
@@ -79,6 +85,8 @@ export function Attacks({
   onChange,
   onRollAttack,
   onRollDamage,
+  weaponCriticalStates,
+  onResetWeaponCriticalState,
   isOpen,
   onToggle,
 }: AttacksProps) {
@@ -246,30 +254,32 @@ export function Attacks({
     );
   };
 
-  const getWeaponDamageConfig = (attack: Attack) => {
+  const getWeaponDamageConfig = (
+    attack: Attack,
+    criticalAttackIndexes: number[] = [],
+  ) => {
     const snapshot = resolveWeaponSnapshot(attack);
     const damageBonuses = summarizeModifiers(
       attack.weaponConfig?.damageModifiers ?? [],
     );
+    const weaponAttackCount = getWeaponAttackCount(attack);
+    const diceCountPerAttack = Math.max(1, snapshot?.damageDiceCount ?? 1);
+    const criticalAttackIndexSet = new Set(criticalAttackIndexes);
 
     return {
-      diceCount: getEffectiveWeaponDiceCount(attack),
+      diceCount: diceCountPerAttack * weaponAttackCount,
       diceType: snapshot?.damageDiceType ?? 6,
       totalBonus: damageBonuses.total,
       perDieBonus: damageBonuses.perDie,
-    };
-  };
-
-  const getCriticalExpression = (attack: Attack) => {
-    const snapshot = resolveWeaponSnapshot(attack);
-
-    if (!snapshot) {
-      return null;
-    }
-
-    return {
-      ...getWeaponDamageConfig(attack),
-      baseMultiplier: snapshot.criticalMultiplier,
+      damageGroups: Array.from(
+        { length: weaponAttackCount },
+        (_, attackIndex) => ({
+          diceCount: diceCountPerAttack,
+          baseMultiplier: criticalAttackIndexSet.has(attackIndex)
+            ? Math.max(1, snapshot?.criticalMultiplier ?? 1)
+            : 1,
+        }),
+      ),
     };
   };
 
@@ -354,6 +364,8 @@ export function Attacks({
             const spellBonusSummary = summarizeModifiers(
               attack.spellConfig?.effectModifiers ?? [],
             );
+            const criticalAttackIndexes = weaponCriticalStates[attack.id] ?? [];
+            const hasCriticalDamageState = criticalAttackIndexes.length > 0;
             const effectiveWeaponDiceCount =
               getEffectiveWeaponDiceCount(attack);
             const criticalRange = weaponSnapshot
@@ -431,6 +443,7 @@ export function Attacks({
                           <DiceButton
                             onClick={() =>
                               onRollAttack(
+                                attack.id,
                                 `${attack.name} Ataque`,
                                 attack.weaponConfig?.attackModifiers.map(
                                   resolveModifier,
@@ -447,13 +460,22 @@ export function Attacks({
                         </div>
 
                         <MacroActionButton
-                          onClick={() =>
-                            onRollDamage(`${attack.name} Dano`, {
-                              ...getWeaponDamageConfig(attack),
-                            })
-                          }
+                          onClick={() => {
+                            onRollDamage(
+                              `${attack.name} Dano`,
+                              getWeaponDamageConfig(
+                                attack,
+                                criticalAttackIndexes,
+                              ),
+                            );
+
+                            if (hasCriticalDamageState) {
+                              onResetWeaponCriticalState(attack.id);
+                            }
+                          }}
                           title="Tirar dano"
                           label="Dano"
+                          tone={hasCriticalDamageState ? "success" : "accent"}
                         >
                           <svg
                             viewBox="0 0 20 20"
@@ -475,38 +497,16 @@ export function Attacks({
                           </svg>
                         </MacroActionButton>
 
-                        {weaponSnapshot ? (
-                          <MacroActionButton
-                            tone="critical"
-                            onClick={() => {
-                              const criticalExpression =
-                                getCriticalExpression(attack);
-
-                              if (criticalExpression) {
-                                onRollDamage(
-                                  `${attack.name} Critico`,
-                                  criticalExpression,
-                                );
-                              }
-                            }}
-                            title="Tirar critico"
-                            label="Crit"
+                        {hasCriticalDamageState ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              onResetWeaponCriticalState(attack.id)
+                            }
+                            className="rounded-xl border border-critical/35 bg-critical/10 px-3 py-2 text-sm text-critical transition-colors hover:bg-critical/15"
                           >
-                            <svg
-                              viewBox="0 0 20 20"
-                              aria-hidden="true"
-                              className="h-4 w-4"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="1.8"
-                            >
-                              <path
-                                d="M10 2.75 11.8 7.2l4.8.38-3.67 3.1 1.15 4.57L10 12.8l-4.08 2.45 1.15-4.57-3.67-3.1 4.8-.38L10 2.75Z"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              />
-                            </svg>
-                          </MacroActionButton>
+                            Reset crit
+                          </button>
                         ) : null}
                       </>
                     ) : (
