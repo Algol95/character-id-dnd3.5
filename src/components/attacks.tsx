@@ -7,8 +7,8 @@ import type { DiceRollMode } from "@/hooks/use-dice-roller";
 import {
   DAMAGE_TYPE_LABELS,
   formatModifier,
+  getCharacterAbilityModifier,
   getFullAttackBonuses,
-  getAbilityModifier,
   type Attack,
   type BattleActionModifier,
   type CharacterData,
@@ -142,7 +142,7 @@ export function Attacks({
       case "charisma":
         return {
           label: `Mod. ${modifier.source}`,
-          value: getAbilityModifier(character[modifier.source]),
+          value: getCharacterAbilityModifier(character, modifier.source),
           application,
         };
     }

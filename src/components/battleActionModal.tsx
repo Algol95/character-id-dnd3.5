@@ -11,7 +11,7 @@ import {
   type BattleActionModifierApplication,
   type DamageType,
   formatModifier,
-  getAbilityModifier,
+  getCharacterAbilityModifier,
   type Attack,
   type BattleActionModifier,
   type BattleActionModifierSource,
@@ -198,36 +198,54 @@ function getWeaponSnapshot(item: EquippedItem): BattleActionWeaponSnapshot {
   });
 }
 
+function resolveModifierSourceValue(
+  character: CharacterData,
+  modifier: BattleActionModifier,
+): number {
+  switch (modifier.source) {
+    case "custom":
+      return modifier.customValue ?? 0;
+    case "baseAttackBonus":
+      return character.baseAttackBonus;
+    case "initiative":
+      return character.initiative;
+    default:
+      return getCharacterAbilityModifier(character, modifier.source);
+  }
+}
+
 function resolveModifierPreviewValue(
   character: CharacterData,
   modifier: BattleActionModifier,
   diceCount: number,
 ): number {
-  const baseValue = (() => {
-    switch (modifier.source) {
-      case "custom":
-        return modifier.customValue ?? 0;
-      case "baseAttackBonus":
-        return character.baseAttackBonus;
-      case "initiative":
-        return character.initiative;
-      default:
-        return getAbilityModifier(character[modifier.source]);
-    }
-  })();
+  const baseValue = resolveModifierSourceValue(character, modifier);
 
   return getEffectiveModifierApplication(modifier, diceCount) === "perDie"
     ? baseValue * diceCount
     : baseValue;
 }
 
-function getModifierPreviewLabel(
+function getModifierPreviewDescription(
+  character: CharacterData,
   modifier: BattleActionModifier,
   diceCount: number,
 ) {
-  return getEffectiveModifierApplication(modifier, diceCount) === "perDie"
-    ? "por dado"
-    : "al total";
+  const application = getEffectiveModifierApplication(modifier, diceCount);
+  const sourceValue = resolveModifierSourceValue(character, modifier);
+  const previewValue = resolveModifierPreviewValue(
+    character,
+    modifier,
+    diceCount,
+  );
+
+  if (application === "perDie") {
+    return diceCount > 1
+      ? `${formatModifier(previewValue)} total (${formatModifier(sourceValue)} por dado)`
+      : `${formatModifier(sourceValue)} por dado`;
+  }
+
+  return `${formatModifier(previewValue)} al total`;
 }
 
 function normalizeModifier(
@@ -473,12 +491,6 @@ function ModifierListEditor({
           </div>
         ) : (
           modifiers.map((modifier) => {
-            const previewValue = resolveModifierPreviewValue(
-              character,
-              modifier,
-              diceCount,
-            );
-
             return (
               <div
                 key={modifier.id}
@@ -590,8 +602,11 @@ function ModifierListEditor({
                 ) : (
                   <div className="mt-3 rounded-xl border border-border/50 bg-background/18 px-3 py-2 text-sm text-muted-foreground">
                     Se aplicara como {MODIFIER_SOURCE_LABELS[modifier.source]}:{" "}
-                    {formatModifier(previewValue)}{" "}
-                    {getModifierPreviewLabel(modifier, diceCount)}
+                    {getModifierPreviewDescription(
+                      character,
+                      modifier,
+                      diceCount,
+                    )}
                   </div>
                 )}
 

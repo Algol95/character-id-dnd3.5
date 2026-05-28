@@ -5,7 +5,7 @@ import { Popover } from "./popover";
 import { SectionShell } from "./sectionShell";
 import {
   formatModifier,
-  getAbilityModifier,
+  getCharacterAbilityModifier,
   type AbilityScoreField,
   type CharacterData,
   type Skill,
@@ -191,9 +191,10 @@ export function Skills({
         <div className="space-y-1">
           {character.skills.map((skill, index) => {
             const abilityKey = ABILITY_KEYS[skill.ability];
-            const abilityMod = getAbilityModifier(
-              (character[abilityKey] as number) +
-                (equipmentBonuses.abilityBonuses[abilityKey] ?? 0),
+            const abilityMod = getCharacterAbilityModifier(
+              character,
+              abilityKey,
+              equipmentBonuses.abilityBonuses[abilityKey] ?? 0,
             );
             const equipmentSkillBonus =
               equipmentBonuses.skillBonuses[skill.name] ?? 0;

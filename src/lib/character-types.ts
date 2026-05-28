@@ -533,6 +533,40 @@ export const DEFAULT_CHARACTER: CharacterData = {
   notes: "",
 };
 
+const TEMP_ABILITY_SCORE_FIELDS: Record<
+  AbilityScoreField,
+  | "tempStrength"
+  | "tempDexterity"
+  | "tempConstitution"
+  | "tempIntelligence"
+  | "tempWisdom"
+  | "tempCharisma"
+> = {
+  strength: "tempStrength",
+  dexterity: "tempDexterity",
+  constitution: "tempConstitution",
+  intelligence: "tempIntelligence",
+  wisdom: "tempWisdom",
+  charisma: "tempCharisma",
+};
+
+export function getEffectiveAbilityScore(
+  character: CharacterData,
+  ability: AbilityScoreField,
+): number {
+  return character[TEMP_ABILITY_SCORE_FIELDS[ability]] ?? character[ability];
+}
+
+export function getCharacterAbilityModifier(
+  character: CharacterData,
+  ability: AbilityScoreField,
+  bonus = 0,
+): number {
+  return getAbilityModifier(
+    getEffectiveAbilityScore(character, ability) + bonus,
+  );
+}
+
 export function getAbilityModifier(score: number): number {
   return Math.floor((score - 10) / 2);
 }
