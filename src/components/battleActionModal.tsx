@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { FormCheckbox } from "@/components/formCheckbox";
 import { FormNumberInput } from "@/components/formNumberInput";
 import { FormSelect, type FormSelectOption } from "@/components/formSelect";
 import { Modal } from "./modal";
@@ -6,6 +7,7 @@ import { DAMAGE_DICE_TYPES, DiceIcon } from "./diceIcon";
 import {
   DAMAGE_TYPE_LABELS,
   DAMAGE_TYPE_OPTIONS,
+  getFullAttackBonuses,
   type BattleActionModifierApplication,
   type DamageType,
   formatModifier,
@@ -142,6 +144,7 @@ function cloneAction(action: Attack): Attack {
     weaponConfig: action.weaponConfig
       ? {
           ...action.weaponConfig,
+          isFullAttack: Boolean(action.weaponConfig.isFullAttack),
           useCustomWeaponProfile:
             action.weaponConfig.useCustomWeaponProfile ?? false,
           extraDamageDiceCount: action.weaponConfig.extraDamageDiceCount ?? 0,
@@ -258,6 +261,7 @@ function createEmptyAction(firstWeapon: EquippedItem | null): Attack {
         selectedWeaponId: firstWeapon.id,
         weaponSnapshot: getWeaponSnapshot(firstWeapon),
         damageType: undefined,
+        isFullAttack: false,
         useCustomWeaponProfile: false,
         extraDamageDiceCount: 0,
         attackModifiers: [],
@@ -275,6 +279,7 @@ function createEmptyAction(firstWeapon: EquippedItem | null): Attack {
       source: "improvised",
       weaponSnapshot: createEmptyWeaponSnapshot(),
       damageType: undefined,
+      isFullAttack: false,
       useCustomWeaponProfile: false,
       extraDamageDiceCount: 0,
       attackModifiers: [],
@@ -410,6 +415,7 @@ interface ModifierListEditorProps {
   onChange: (modifiers: BattleActionModifier[]) => void;
   allowPerDie?: boolean;
   diceCount?: number;
+  sourceOptions?: FormSelectOption[];
 }
 
 function ModifierListEditor({
@@ -420,6 +426,7 @@ function ModifierListEditor({
   onChange,
   allowPerDie = false,
   diceCount = 1,
+  sourceOptions = MODIFIER_SOURCE_OPTIONS,
 }: ModifierListEditorProps) {
   const previewTotal = useMemo(
     () =>
@@ -498,7 +505,7 @@ function ModifierListEditor({
                               : undefined,
                         }))
                       }
-                      options={MODIFIER_SOURCE_OPTIONS}
+                      options={sourceOptions}
                       ariaLabel={`Fuente para ${title}`}
                     />
                   </label>
@@ -676,8 +683,12 @@ export function BattleActionModal({
         normalizeWeaponSnapshot(currentWeaponConfig.weaponSnapshot))
       : normalizeWeaponSnapshot(currentWeaponConfig.weaponSnapshot)
     : null;
+  const currentWeaponAttackBonusTotal = character.baseAttackBonus;
+  const fullAttackBonuses = getFullAttackBonuses(currentWeaponAttackBonusTotal);
+  const canUseFullAttack = character.baseAttackBonus > 5;
   const weaponAttackCount =
-    1 + Math.max(0, currentWeaponConfig?.extraDamageDiceCount ?? 0);
+    (currentWeaponConfig?.isFullAttack ? fullAttackBonuses.length : 1) +
+    Math.max(0, currentWeaponConfig?.extraDamageDiceCount ?? 0);
   const effectiveWeaponDiceCount =
     Math.max(1, currentWeaponSnapshot?.damageDiceCount ?? 1) *
     weaponAttackCount;
@@ -710,6 +721,7 @@ export function BattleActionModal({
             ? getWeaponSnapshot(equippedWeapons[0])
             : createEmptyWeaponSnapshot(),
           damageType: undefined,
+          isFullAttack: false,
           useCustomWeaponProfile: false,
           extraDamageDiceCount: 0,
           attackModifiers: [],
@@ -804,6 +816,9 @@ export function BattleActionModal({
             : undefined,
         weaponSnapshot: normalizedSnapshot,
         damageType: baseWeaponConfig.damageType,
+        isFullAttack: Boolean(
+          baseWeaponConfig.isFullAttack && canUseFullAttack,
+        ),
         useCustomWeaponProfile:
           baseWeaponConfig.source === "equipped"
             ? Boolean(baseWeaponConfig.useCustomWeaponProfile)
@@ -1058,6 +1073,29 @@ export function BattleActionModal({
                 />
               </label>
 
+              <div className="rounded-2xl border border-border/60 bg-secondary/15 p-4">
+                <FormCheckbox
+                  checked={Boolean(
+                    currentWeaponConfig.isFullAttack && canUseFullAttack,
+                  )}
+                  disabled={!canUseFullAttack}
+                  onChange={(checked) =>
+                    setWeaponConfig((currentConfig) => ({
+                      ...currentConfig,
+                      isFullAttack: checked,
+                    }))
+                  }
+                  ariaLabel="Marcar la macro como ataque completo"
+                  label="Ataque completo"
+                  description={
+                    canUseFullAttack
+                      ? `Secuencia resultante: ${fullAttackBonuses.map((bonus) => formatModifier(bonus)).join(" / ")}`
+                      : "Necesitas un bono base de ataque superior a +5 para habilitarlo."
+                  }
+                  className="w-full"
+                />
+              </div>
+
               {currentWeaponConfig.source === "equipped" ? (
                 <div className="rounded-2xl border border-border/60 bg-secondary/15 p-4 text-sm leading-6 text-muted-foreground">
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1240,7 +1278,7 @@ export function BattleActionModal({
             <>
               <ModifierListEditor
                 title="Bonos al ataque"
-                description="Aqui puedes sumar atributos o estadisticas al d20 del ataque."
+                description="Aqui puedes sumar atributos o ajustes adicionales al d20. El bono base de ataque del personaje se aplica automaticamente."
                 character={character}
                 modifiers={currentWeaponConfig.attackModifiers}
                 onChange={(attackModifiers) =>

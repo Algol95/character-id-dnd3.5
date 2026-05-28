@@ -7,6 +7,7 @@ import type { DiceRollMode } from "@/hooks/use-dice-roller";
 import {
   DAMAGE_TYPE_LABELS,
   formatModifier,
+  getFullAttackBonuses,
   getAbilityModifier,
   type Attack,
   type BattleActionModifier,
@@ -27,6 +28,7 @@ interface AttacksProps {
     diceCount?: number,
     criticalThreatRangeStart?: number,
     mode?: DiceRollMode,
+    attackBonusTotals?: number[],
   ) => void;
   onRollDamage: (
     attackName: string,
@@ -181,10 +183,28 @@ export function Attacks({
   };
 
   const getWeaponAttackCount = (attack: Attack) =>
-    Math.max(
-      1,
-      1 + Math.max(0, attack.weaponConfig?.extraDamageDiceCount ?? 0),
+    getWeaponAttackBonusTotals(attack).length;
+
+  const getWeaponAttackBonusTotals = (attack: Attack) => {
+    const attackBonusModifierTotal = summarizeModifiers(
+      attack.weaponConfig?.attackModifiers ?? [],
+    ).total;
+    const baseSequence = attack.weaponConfig?.isFullAttack
+      ? getFullAttackBonuses(character.baseAttackBonus)
+      : [character.baseAttackBonus];
+    const extraAttackCount = Math.max(
+      0,
+      attack.weaponConfig?.extraDamageDiceCount ?? 0,
     );
+
+    return [
+      ...baseSequence.map((bonus) => bonus + attackBonusModifierTotal),
+      ...Array.from(
+        { length: extraAttackCount },
+        () => character.baseAttackBonus + attackBonusModifierTotal,
+      ),
+    ];
+  };
 
   const getEffectiveWeaponDiceCount = (attack: Attack) => {
     const snapshot = resolveWeaponSnapshot(attack);
@@ -381,10 +401,17 @@ export function Attacks({
               attack.actionType === "weapon"
                 ? resolveWeaponSnapshot(attack)
                 : null;
-            const weaponAttackCount = getWeaponAttackCount(attack);
-            const attackBonusTotal = summarizeModifiers(
-              attack.weaponConfig?.attackModifiers ?? [],
-            ).total;
+            const weaponAttackRollModifiers = [
+              {
+                label: "Bono base de ataque",
+                value: character.baseAttackBonus,
+              },
+              ...((attack.weaponConfig?.attackModifiers ?? []).map(
+                resolveModifier,
+              ) ?? []),
+            ];
+            const weaponAttackBonuses = getWeaponAttackBonusTotals(attack);
+            const weaponAttackCount = weaponAttackBonuses.length;
             const damageBonusSummary = summarizeModifiers(
               attack.weaponConfig?.damageModifiers ?? [],
             );
@@ -434,10 +461,14 @@ export function Attacks({
                             {weaponSnapshot.criticalMultiplier}
                           </div>
                           <div>
-                            Ataque {formatModifier(attackBonusTotal)}
-                            {weaponAttackCount > 1
-                              ? ` x${weaponAttackCount}`
-                              : ""}{" "}
+                            Ataque{" "}
+                            {weaponAttackBonuses.every(
+                              (bonus) => bonus === weaponAttackBonuses[0],
+                            )
+                              ? `${formatModifier(weaponAttackBonuses[0] ?? 0)}${weaponAttackCount > 1 ? ` x${weaponAttackCount}` : ""}`
+                              : weaponAttackBonuses
+                                  .map((bonus) => formatModifier(bonus))
+                                  .join(" / ")}{" "}
                             · Dano {getWeaponDamageExpression(attack)}
                             {damageBonusSummary.total !== 0 ||
                             damageBonusSummary.perDie !== 0
@@ -514,12 +545,11 @@ export function Attacks({
                               onRollAttack(
                                 attack.id,
                                 `${attack.name} Ataque`,
-                                attack.weaponConfig?.attackModifiers.map(
-                                  resolveModifier,
-                                ) ?? [],
+                                weaponAttackRollModifiers,
                                 weaponAttackCount,
                                 weaponSnapshot?.criticalRangeStart,
                                 selectedAttackRollMode,
+                                weaponAttackBonuses,
                               )
                             }
                             size="md"

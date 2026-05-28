@@ -114,6 +114,26 @@ export const DAMAGE_TYPE_LABELS: Record<DamageType, string> = {
   necrotic: "Necrotico",
 };
 
+export function getFullAttackBonuses(attackBonus: number): number[] {
+  const normalizedAttackBonus = Number.isFinite(attackBonus)
+    ? Math.trunc(attackBonus)
+    : 0;
+  const bonuses = [normalizedAttackBonus];
+  let currentBonus = normalizedAttackBonus;
+
+  while (currentBonus > 5) {
+    currentBonus -= 5;
+
+    if (currentBonus < 1) {
+      break;
+    }
+
+    bonuses.push(currentBonus);
+  }
+
+  return bonuses;
+}
+
 export type BattleActionType = "weapon" | "spell";
 
 export type BattleActionModifierSource =
@@ -141,6 +161,7 @@ export interface WeaponAttackConfig {
   selectedWeaponId?: string;
   weaponSnapshot: BattleActionWeaponSnapshot;
   damageType?: DamageType;
+  isFullAttack?: boolean;
   useCustomWeaponProfile?: boolean;
   extraDamageDiceCount?: number;
   attackModifiers: BattleActionModifier[];

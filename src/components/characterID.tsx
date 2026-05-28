@@ -253,6 +253,7 @@ function normalizeStoredAttack(
       weaponConfig: storedAttack.weaponConfig
         ? {
             ...storedAttack.weaponConfig,
+            isFullAttack: Boolean(storedAttack.weaponConfig.isFullAttack),
             useCustomWeaponProfile: Boolean(
               storedAttack.weaponConfig.useCustomWeaponProfile,
             ),
@@ -449,6 +450,7 @@ export function CharacterId() {
       diceCount = 1,
       criticalThreatRangeStart?: number,
       mode: DiceRollMode = "normal",
+      attackBonusTotals?: number[],
     ) => {
       if (actionId) {
         setWeaponCriticalStates((currentStates) => {
@@ -475,6 +477,10 @@ export function CharacterId() {
         (sum, modifier) => sum + modifier.value,
         0,
       );
+      const resolvedAttackBonusTotals =
+        attackBonusTotals && attackBonusTotals.length === diceCount
+          ? attackBonusTotals
+          : Array.from({ length: diceCount }, () => modifierTotal);
       const shouldPairRolls = mode !== "normal";
       const attackRolls = shouldPairRolls
         ? Array.from({ length: diceCount }, () => [
@@ -518,7 +524,13 @@ export function CharacterId() {
       rollDice(20, modifiers, {
         highlightOutcome: criticalThreatRangeStart === undefined,
         presetRolls: attackRolls,
-        chipValues: attackRolls.map((roll) => roll + modifierTotal),
+        chipValues: attackRolls.map((roll, index) => {
+          const attackIndex = shouldPairRolls ? Math.floor(index / 2) : index;
+
+          return (
+            roll + (resolvedAttackBonusTotals[attackIndex] ?? modifierTotal)
+          );
+        }),
         chipAttackIndexes: shouldPairRolls
           ? Array.from({ length: diceCount }, (_, attackIndex) => [
               attackIndex,
