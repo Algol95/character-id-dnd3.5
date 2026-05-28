@@ -21,6 +21,7 @@ interface AttacksProps {
     attackName: string,
     modifiers: { label: string; value: number }[],
     diceCount?: number,
+    criticalThreatRangeStart?: number,
   ) => void;
   onRollDamage: (
     attackName: string,
@@ -137,7 +138,11 @@ export function Attacks({
       return null;
     }
 
-    if (config.source === "equipped" && config.selectedWeaponId) {
+    if (
+      config.source === "equipped" &&
+      config.selectedWeaponId &&
+      !config.useCustomWeaponProfile
+    ) {
       const equippedWeapon = character.equippedItems.find(
         (item) =>
           item.id === config.selectedWeaponId &&
@@ -160,12 +165,19 @@ export function Attacks({
     return config.weaponSnapshot;
   };
 
+  const getWeaponAttackCount = (attack: Attack) =>
+    Math.max(
+      1,
+      1 + Math.max(0, attack.weaponConfig?.extraDamageDiceCount ?? 0),
+    );
+
   const getEffectiveWeaponDiceCount = (attack: Attack) => {
     const snapshot = resolveWeaponSnapshot(attack);
+
     return Math.max(
       1,
-      (snapshot?.damageDiceCount ?? 1) +
-        Math.max(0, attack.weaponConfig?.extraDamageDiceCount ?? 0),
+      Math.max(1, snapshot?.damageDiceCount ?? 1) *
+        getWeaponAttackCount(attack),
     );
   };
 
@@ -332,6 +344,7 @@ export function Attacks({
               attack.actionType === "weapon"
                 ? resolveWeaponSnapshot(attack)
                 : null;
+            const weaponAttackCount = getWeaponAttackCount(attack);
             const attackBonusTotal = summarizeModifiers(
               attack.weaponConfig?.attackModifiers ?? [],
             ).total;
@@ -377,8 +390,8 @@ export function Attacks({
                           </div>
                           <div>
                             Ataque {formatModifier(attackBonusTotal)}
-                            {effectiveWeaponDiceCount > 1
-                              ? ` x${effectiveWeaponDiceCount}`
+                            {weaponAttackCount > 1
+                              ? ` x${weaponAttackCount}`
                               : ""}{" "}
                             · Dano {getWeaponDamageExpression(attack)}
                             {damageBonusSummary.total !== 0 ||
@@ -422,7 +435,8 @@ export function Attacks({
                                 attack.weaponConfig?.attackModifiers.map(
                                   resolveModifier,
                                 ) ?? [],
-                                effectiveWeaponDiceCount,
+                                weaponAttackCount,
+                                weaponSnapshot?.criticalRangeStart,
                               )
                             }
                             size="md"

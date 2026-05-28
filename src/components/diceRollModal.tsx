@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { DiceRollResult } from "@/hooks/use-dice-roller";
 
@@ -20,6 +20,7 @@ interface DiceShapeProps {
   roll?: number;
   isRolling: boolean;
   colorClass: string;
+  sizeClassName?: string;
 }
 
 interface DiceValueProps {
@@ -40,7 +41,28 @@ interface ResultAppearance {
 
 interface RollChipProps {
   value: number;
+  originalValue?: number;
   isSelected: boolean;
+  tone?: "default" | "critical" | "fumble";
+}
+
+interface CriticalConfirmationState {
+  isRolling: boolean;
+  previewRoll: number;
+  result?: {
+    roll: number;
+    total: number;
+  };
+}
+
+function rollDie(sides: number) {
+  if (typeof crypto !== "undefined" && "getRandomValues" in crypto) {
+    const values = new Uint32Array(1);
+    crypto.getRandomValues(values);
+    return (values[0] % sides) + 1;
+  }
+
+  return Math.floor(Math.random() * sides) + 1;
 }
 
 function hasCriticalOutcome(result: DiceRollResult | null) {
@@ -54,6 +76,17 @@ function hasCriticalOutcome(result: DiceRollResult | null) {
 function hasFumbleOutcome(result: DiceRollResult | null) {
   return Boolean(
     result && result.diceType > 1 && (result.isFumble || result.roll === 1),
+  );
+}
+
+function hasCriticalThreat(result: DiceRollResult | null) {
+  return Boolean(
+    result &&
+    result.diceType === 20 &&
+    result.criticalThreatRangeStart !== undefined &&
+    result.criticalThreatRangeStart < 20 &&
+    result.roll >= result.criticalThreatRangeStart &&
+    result.roll < 20,
   );
 }
 
@@ -79,6 +112,14 @@ function getResultAppearance(result: DiceRollResult | null): ResultAppearance {
       diceColorClass: "text-fumble animate-fumble-shake",
       backdropClass: "bg-fumble/20",
       resultMessage: "PIFIA",
+    };
+  }
+
+  if (hasCriticalThreat(result)) {
+    return {
+      diceColorClass: "text-critical animate-critical-glow",
+      backdropClass: "bg-black/80",
+      resultMessage: "",
     };
   }
 
@@ -116,16 +157,221 @@ function DiceValue({
   );
 }
 
-function RollChip({ value, isSelected }: RollChipProps) {
+function RollChip({
+  value,
+  originalValue,
+  isSelected,
+  tone = "default",
+}: RollChipProps) {
+  const toneClasses =
+    tone === "critical"
+      ? "border-critical/55 bg-critical/12 text-critical shadow-[0_0_18px_color-mix(in_oklab,var(--critical)_32%,transparent)]"
+      : tone === "fumble"
+        ? "border-fumble/55 bg-fumble/12 text-fumble shadow-[0_0_18px_color-mix(in_oklab,var(--fumble)_26%,transparent)]"
+        : isSelected
+          ? "border-gold bg-gold/15 text-gold shadow-[0_0_18px_rgba(212,175,55,0.18)]"
+          : "border-border/80 bg-background/55 text-muted-foreground";
+
+  const originalValueClass =
+    tone === "critical"
+      ? "text-critical/80"
+      : tone === "fumble"
+        ? "text-fumble/80"
+        : "text-gold-dim/80";
+
   return (
     <div
-      className={`min-w-16 rounded-xl border px-3 py-2 text-center transition-colors ${
-        isSelected
-          ? "border-gold bg-gold/15 text-gold shadow-[0_0_18px_rgba(212,175,55,0.18)]"
-          : "border-border/80 bg-background/55 text-muted-foreground"
-      }`}
+      className={`min-w-16 rounded-xl border px-3 py-2 text-center transition-colors ${toneClasses}`}
     >
+      {originalValue !== undefined ? (
+        <div
+          className={`text-[10px] uppercase tracking-[0.16em] ${originalValueClass}`}
+        >
+          base {originalValue}
+        </div>
+      ) : null}
       <div className="mt-1 text-2xl font-bold">{value}</div>
+    </div>
+  );
+}
+
+function formatSignedValue(value: number) {
+  return value >= 0 ? `+${value}` : `${value}`;
+}
+
+function CriticalConfirmationControl({
+  isNaturalCritical,
+  isThreatened,
+  modifierTotal,
+}: {
+  isNaturalCritical: boolean;
+  isThreatened: boolean;
+  modifierTotal: number;
+}) {
+  const [attemptCount, setAttemptCount] = useState(0);
+  const [confirmationDecision, setConfirmationDecision] = useState<
+    "confirmed" | "rejected" | null
+  >(null);
+  const [confirmationState, setConfirmationState] =
+    useState<CriticalConfirmationState | null>(null);
+
+  useEffect(() => {
+    if (attemptCount === 0) {
+      return;
+    }
+
+    let isActive = true;
+
+    const intervalId = window.setInterval(() => {
+      if (!isActive) {
+        return;
+      }
+
+      setConfirmationState((currentState) => {
+        if (!currentState?.isRolling) {
+          return currentState;
+        }
+
+        return {
+          ...currentState,
+          previewRoll: rollDie(20),
+        };
+      });
+    }, 85);
+
+    const timeoutId = window.setTimeout(() => {
+      window.clearInterval(intervalId);
+
+      if (!isActive) {
+        return;
+      }
+
+      const confirmationRoll = rollDie(20);
+
+      setConfirmationState({
+        isRolling: false,
+        previewRoll: confirmationRoll,
+        result: {
+          roll: confirmationRoll,
+          total: confirmationRoll + modifierTotal,
+        },
+      });
+    }, 900);
+
+    return () => {
+      isActive = false;
+      window.clearInterval(intervalId);
+      window.clearTimeout(timeoutId);
+    };
+  }, [attemptCount, modifierTotal]);
+
+  if (isNaturalCritical) {
+    return (
+      <div className="rounded-full border border-critical/40 bg-critical/12 px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-critical">
+        Critico natural
+      </div>
+    );
+  }
+
+  // TODO: Cuando exista la seccion de reglas especiales, permitir una regla
+  // que trate cualquier amenaza de critico dentro del rango como critico
+  // natural y omita por completo este flujo de confirmacion.
+  if (!isThreatened) {
+    return null;
+  }
+
+  const displayedConfirmationRoll =
+    confirmationState?.result?.roll ?? confirmationState?.previewRoll;
+
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <button
+        type="button"
+        onClick={() => {
+          setConfirmationDecision(null);
+          setConfirmationState({
+            isRolling: true,
+            previewRoll: rollDie(20),
+          });
+          setAttemptCount((currentCount) => currentCount + 1);
+        }}
+        disabled={confirmationState?.isRolling}
+        className="rounded-full border border-gold/40 bg-gold/12 px-3 py-1.5 text-[11px] uppercase tracking-[0.16em] text-gold transition-colors hover:bg-gold/18 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        {confirmationState?.result
+          ? "Repetir confirmacion"
+          : "Confirmar critico"}
+      </button>
+
+      {confirmationState ? (
+        <div className="flex flex-col items-center gap-2 rounded-2xl border border-border/60 bg-background/35 px-3 py-3 text-center">
+          <div className="relative flex h-16 w-16 items-center justify-center">
+            <DiceShape
+              diceType={20}
+              roll={displayedConfirmationRoll}
+              isRolling={confirmationState.isRolling}
+              colorClass="text-accent"
+              sizeClassName="h-16 w-16"
+            />
+          </div>
+
+          <div className="text-[10px] uppercase tracking-[0.16em] text-gold-dim">
+            {confirmationState.isRolling
+              ? "Confirmando..."
+              : "Tirada de confirmacion"}
+          </div>
+
+          {confirmationState.result ? (
+            <>
+              <div className="text-xs text-muted-foreground">
+                {confirmationState.result.roll}
+                {modifierTotal !== 0
+                  ? ` ${formatSignedValue(modifierTotal)}`
+                  : ""}{" "}
+                = {confirmationState.result.total}
+              </div>
+
+              <div
+                className={`mt-1 grid w-full transition-all duration-300 ${
+                  confirmationDecision
+                    ? "grid-cols-2 gap-0"
+                    : "grid-cols-2 gap-2"
+                }`}
+              >
+                <button
+                  type="button"
+                  onClick={() => setConfirmationDecision("confirmed")}
+                  disabled={confirmationDecision !== null}
+                  className={`rounded-full border px-3 py-1 text-[10px] uppercase tracking-[0.16em] transition-all duration-300 ${
+                    confirmationDecision === "confirmed"
+                      ? "col-span-2 justify-self-center border-critical/45 bg-critical/14 text-critical shadow-[0_0_18px_color-mix(in_oklab,var(--critical)_28%,transparent)]"
+                      : confirmationDecision === "rejected"
+                        ? "pointer-events-none w-0 justify-self-start scale-90 overflow-hidden border-0 px-0 py-0 opacity-0"
+                        : "border-border/60 bg-background/20 text-muted-foreground hover:border-critical/35 hover:text-critical"
+                  }`}
+                >
+                  Critico confirmado
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setConfirmationDecision("rejected")}
+                  disabled={confirmationDecision !== null}
+                  className={`rounded-full border px-3 py-1 text-[10px] uppercase tracking-[0.16em] transition-all duration-300 ${
+                    confirmationDecision === "rejected"
+                      ? "col-span-2 justify-self-center border-fumble/45 bg-fumble/14 text-fumble shadow-[0_0_18px_color-mix(in_oklab,var(--fumble)_24%,transparent)]"
+                      : confirmationDecision === "confirmed"
+                        ? "pointer-events-none w-0 justify-self-end scale-90 overflow-hidden border-0 px-0 py-0 opacity-0"
+                        : "border-border/60 bg-background/20 text-muted-foreground hover:border-fumble/35 hover:text-fumble"
+                  }`}
+                >
+                  No confirmado
+                </button>
+              </div>
+            </>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -200,8 +446,66 @@ export function DiceRollModal({
 
   const appearance = getResultAppearance(result);
   const hasMultipleRolls = (result?.rolls.length ?? 0) > 1;
+  const criticalConfirmationSessionKey = `${rollLabel}:${result?.diceType ?? 0}:${result?.selectedRollIndex ?? 0}:${result?.criticalThreatRangeStart ?? "none"}:${result?.rolls.join(",") ?? ""}`;
+  const confirmationModifierTotal =
+    result?.modifierBreakdown.reduce(
+      (sum, modifier) => sum + modifier.value,
+      0,
+    ) ?? 0;
+  const threatenedRollIndexes =
+    result?.diceType === 20 &&
+    result.criticalThreatRangeStart !== undefined &&
+    result.criticalThreatRangeStart < 20
+      ? result.rolls.reduce<number[]>((indexes, rollValue, index) => {
+          if (rollValue >= result.criticalThreatRangeStart! && rollValue < 20) {
+            indexes.push(index);
+          }
+
+          return indexes;
+        }, [])
+      : [];
   const showOutcomeMessage =
     hasCriticalOutcome(result) || hasFumbleOutcome(result);
+
+  const isNaturalCriticalRoll = (rollIndex: number) =>
+    result?.diceType === 20 && (result.rolls[rollIndex] ?? 0) === 20;
+
+  const isThreatenedRoll = (rollIndex: number) =>
+    threatenedRollIndexes.includes(rollIndex);
+
+  const getRollChipTone = (rollIndex: number) => {
+    const currentRoll = result?.rolls[rollIndex] ?? 0;
+    const diceType = result?.diceType ?? 0;
+
+    if (diceType === 20 && currentRoll === 20) {
+      return "critical" as const;
+    }
+
+    if (diceType === 20 && isThreatenedRoll(rollIndex)) {
+      return "critical" as const;
+    }
+
+    if (diceType > 1 && currentRoll === 1) {
+      return "fumble" as const;
+    }
+
+    return "default" as const;
+  };
+
+  const renderCriticalInteraction = (rollIndex: number) => {
+    if (!result || result.diceType !== 20) {
+      return null;
+    }
+
+    return (
+      <CriticalConfirmationControl
+        key={`${criticalConfirmationSessionKey}-${rollIndex}`}
+        isNaturalCritical={isNaturalCriticalRoll(rollIndex)}
+        isThreatened={isThreatenedRoll(rollIndex)}
+        modifierTotal={confirmationModifierTotal}
+      />
+    );
+  };
 
   const handleBackdropClick = () => {
     if (canCloseRef.current && !isRolling) {
@@ -250,14 +554,29 @@ export function DiceRollModal({
         {result && hasMultipleRolls && !isRolling && (
           <div className="flex flex-wrap items-center justify-center gap-3">
             {result.rolls.map((rollValue, index) => (
-              <RollChip
+              <div
                 key={`${rollValue}-${index}`}
-                value={rollValue}
-                isSelected={index === result.selectedRollIndex}
-              />
+                className="flex flex-col items-center gap-2"
+              >
+                <RollChip
+                  value={result.chipValues?.[index] ?? rollValue}
+                  originalValue={
+                    result.chipValues?.[index] !== undefined
+                      ? rollValue
+                      : undefined
+                  }
+                  isSelected={index === result.selectedRollIndex}
+                  tone={getRollChipTone(index)}
+                />
+                {renderCriticalInteraction(index)}
+              </div>
             ))}
           </div>
         )}
+
+        {result && !hasMultipleRolls && !isRolling
+          ? renderCriticalInteraction(0)
+          : null}
 
         {result && showOutcomeMessage && (
           <div

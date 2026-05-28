@@ -250,6 +250,9 @@ function normalizeStoredAttack(
       weaponConfig: storedAttack.weaponConfig
         ? {
             ...storedAttack.weaponConfig,
+            useCustomWeaponProfile: Boolean(
+              storedAttack.weaponConfig.useCustomWeaponProfile,
+            ),
             extraDamageDiceCount: Math.max(
               0,
               storedAttack.weaponConfig.extraDamageDiceCount ?? 0,
@@ -434,21 +437,32 @@ export function CharacterId() {
   );
 
   const handleNamedRoll = useCallback(
-    (label: string, modifiers: RollModifier[], diceCount = 1) => {
-      if (diceCount <= 1) {
+    (
+      label: string,
+      modifiers: RollModifier[],
+      diceCount = 1,
+      criticalThreatRangeStart?: number,
+    ) => {
+      if (diceCount <= 1 && criticalThreatRangeStart === undefined) {
         handleRoll(label, modifiers);
         return;
       }
 
+      const modifierTotal = modifiers.reduce(
+        (sum, modifier) => sum + modifier.value,
+        0,
+      );
       const attackRolls = Array.from(
         { length: diceCount },
         () => Math.floor(Math.random() * 20) + 1,
       );
 
-      setRollLabel(`${label} (${diceCount} ataques)`);
+      setRollLabel(diceCount > 1 ? `${label} (${diceCount} ataques)` : label);
       rollDice(20, modifiers, {
-        highlightOutcome: false,
+        highlightOutcome: criticalThreatRangeStart === undefined,
         presetRolls: attackRolls,
+        chipValues: attackRolls.map((roll) => roll + modifierTotal),
+        criticalThreatRangeStart,
         selectedRollIndex: 0,
       });
     },
@@ -533,6 +547,10 @@ export function CharacterId() {
       rollDice(diceType, modifiers, {
         highlightOutcome: false,
         presetRolls: baseRolls,
+        chipValues:
+          perDieBonus !== 0
+            ? baseRolls.map((roll) => roll + perDieBonus)
+            : undefined,
         selectedRollIndex,
       });
     },

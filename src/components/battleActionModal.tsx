@@ -130,6 +130,8 @@ function cloneAction(action: Attack): Attack {
     weaponConfig: action.weaponConfig
       ? {
           ...action.weaponConfig,
+          useCustomWeaponProfile:
+            action.weaponConfig.useCustomWeaponProfile ?? false,
           extraDamageDiceCount: action.weaponConfig.extraDamageDiceCount ?? 0,
           weaponSnapshot: { ...action.weaponConfig.weaponSnapshot },
           attackModifiers:
@@ -242,6 +244,7 @@ function createEmptyAction(firstWeapon: EquippedItem | null): Attack {
         source: "equipped",
         selectedWeaponId: firstWeapon.id,
         weaponSnapshot: getWeaponSnapshot(firstWeapon),
+        useCustomWeaponProfile: false,
         extraDamageDiceCount: 0,
         attackModifiers: [],
         damageModifiers: [],
@@ -257,11 +260,131 @@ function createEmptyAction(firstWeapon: EquippedItem | null): Attack {
     weaponConfig: {
       source: "improvised",
       weaponSnapshot: createEmptyWeaponSnapshot(),
+      useCustomWeaponProfile: false,
       extraDamageDiceCount: 0,
       attackModifiers: [],
       damageModifiers: [],
     },
   };
+}
+
+interface WeaponProfileEditorProps {
+  snapshot: BattleActionWeaponSnapshot;
+  onChange: (snapshot: BattleActionWeaponSnapshot) => void;
+  nameLabel: string;
+  namePlaceholder: string;
+}
+
+function WeaponProfileEditor({
+  snapshot,
+  onChange,
+  nameLabel,
+  namePlaceholder,
+}: WeaponProfileEditorProps) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      <label className="block sm:col-span-2">
+        <span className="mb-1.5 block text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+          {nameLabel}
+        </span>
+        <input
+          type="text"
+          value={snapshot.name}
+          onChange={(event) =>
+            onChange({
+              ...snapshot,
+              name: event.target.value,
+            })
+          }
+          className="w-full rounded-xl px-3 py-2 text-sm"
+          placeholder={namePlaceholder}
+        />
+      </label>
+
+      <label className="block">
+        <span className="mb-1.5 block text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+          Cantidad de dados
+        </span>
+        <FormNumberInput
+          value={snapshot.damageDiceCount}
+          onChange={(value) =>
+            onChange(
+              normalizeWeaponSnapshot({
+                ...snapshot,
+                damageDiceCount: Number.parseInt(value, 10) || 1,
+              }),
+            )
+          }
+          min={1}
+          className="w-full"
+          inputClassName="rounded-xl px-3 py-2 text-center text-sm"
+          ariaLabel="Cantidad de dados del arma"
+        />
+      </label>
+
+      <label className="block">
+        <span className="mb-1.5 block text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+          Dado de dano
+        </span>
+        <FormSelect
+          value={String(snapshot.damageDiceType)}
+          onChange={(value) =>
+            onChange(
+              normalizeWeaponSnapshot({
+                ...snapshot,
+                damageDiceType: Number.parseInt(value, 10) || 6,
+              }),
+            )
+          }
+          options={DAMAGE_DICE_OPTIONS}
+          ariaLabel="Dado del arma"
+        />
+      </label>
+
+      <label className="block">
+        <span className="mb-1.5 block text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+          Critico desde
+        </span>
+        <FormNumberInput
+          value={snapshot.criticalRangeStart}
+          onChange={(value) =>
+            onChange(
+              normalizeWeaponSnapshot({
+                ...snapshot,
+                criticalRangeStart: Number.parseInt(value, 10) || 20,
+              }),
+            )
+          }
+          min={1}
+          max={20}
+          className="w-full"
+          inputClassName="rounded-xl px-3 py-2 text-center text-sm"
+          ariaLabel="Rango critico del arma"
+        />
+      </label>
+
+      <label className="block">
+        <span className="mb-1.5 block text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+          Multiplicador critico
+        </span>
+        <FormNumberInput
+          value={snapshot.criticalMultiplier}
+          onChange={(value) =>
+            onChange(
+              normalizeWeaponSnapshot({
+                ...snapshot,
+                criticalMultiplier: Number.parseInt(value, 10) || 2,
+              }),
+            )
+          }
+          min={2}
+          className="w-full"
+          inputClassName="rounded-xl px-3 py-2 text-center text-sm"
+          ariaLabel="Multiplicador critico del arma"
+        />
+      </label>
+    </div>
+  );
 }
 
 interface ModifierListEditorProps {
@@ -528,14 +651,21 @@ export function BattleActionModal({
           (item) => item.id === currentWeaponConfig.selectedWeaponId,
         ) ?? null)
       : null;
-  const currentWeaponSnapshot = currentWeaponConfig
-    ? selectedEquippedWeapon
-      ? getWeaponSnapshot(selectedEquippedWeapon)
-      : currentWeaponConfig.weaponSnapshot
+  const equippedWeaponSnapshot = selectedEquippedWeapon
+    ? getWeaponSnapshot(selectedEquippedWeapon)
     : null;
+  const currentWeaponSnapshot = currentWeaponConfig
+    ? currentWeaponConfig.source === "equipped" &&
+      !currentWeaponConfig.useCustomWeaponProfile
+      ? (equippedWeaponSnapshot ??
+        normalizeWeaponSnapshot(currentWeaponConfig.weaponSnapshot))
+      : normalizeWeaponSnapshot(currentWeaponConfig.weaponSnapshot)
+    : null;
+  const weaponAttackCount =
+    1 + Math.max(0, currentWeaponConfig?.extraDamageDiceCount ?? 0);
   const effectiveWeaponDiceCount =
-    (currentWeaponSnapshot?.damageDiceCount ?? 1) +
-    Math.max(0, currentWeaponConfig?.extraDamageDiceCount ?? 0);
+    Math.max(1, currentWeaponSnapshot?.damageDiceCount ?? 1) *
+    weaponAttackCount;
 
   const canSave =
     draft.name.trim().length > 0 &&
@@ -564,6 +694,7 @@ export function BattleActionModal({
           weaponSnapshot: equippedWeapons[0]
             ? getWeaponSnapshot(equippedWeapons[0])
             : createEmptyWeaponSnapshot(),
+          useCustomWeaponProfile: false,
           extraDamageDiceCount: 0,
           attackModifiers: [],
           damageModifiers: [],
@@ -633,7 +764,10 @@ export function BattleActionModal({
           ) ?? null)
         : null;
     const weaponSnapshot = equippedWeapon
-      ? getWeaponSnapshot(equippedWeapon)
+      ? baseWeaponConfig.source === "equipped" &&
+        baseWeaponConfig.useCustomWeaponProfile
+        ? normalizeWeaponSnapshot(baseWeaponConfig.weaponSnapshot)
+        : getWeaponSnapshot(equippedWeapon)
       : normalizeWeaponSnapshot(baseWeaponConfig.weaponSnapshot);
     const normalizedSnapshot = {
       ...weaponSnapshot,
@@ -652,6 +786,10 @@ export function BattleActionModal({
             ? (equippedWeapon?.id ?? baseWeaponConfig.selectedWeaponId)
             : undefined,
         weaponSnapshot: normalizedSnapshot,
+        useCustomWeaponProfile:
+          baseWeaponConfig.source === "equipped"
+            ? Boolean(baseWeaponConfig.useCustomWeaponProfile)
+            : false,
         extraDamageDiceCount: Math.max(
           0,
           baseWeaponConfig.extraDamageDiceCount ?? 0,
@@ -677,7 +815,7 @@ export function BattleActionModal({
     <Modal
       open
       onClose={onClose}
-      panelClassName="max-w-5xl"
+      panelClassName="max-w-6xl"
       header={
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
@@ -719,245 +857,147 @@ export function BattleActionModal({
         </div>
       }
     >
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-        <div className="space-y-4">
-          <label className="block">
-            <span className="mb-1.5 block text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-              Nombre de la accion
-            </span>
-            <input
-              type="text"
-              value={draft.name}
-              onChange={(event) =>
-                setDraft((currentDraft) => ({
-                  ...currentDraft,
-                  name: event.target.value,
-                }))
-              }
-              className="w-full rounded-2xl px-4 py-3 text-sm"
-              placeholder="Ej. Espadazo giratorio o Proyectil magico"
-            />
-          </label>
-
-          <label className="block">
-            <span className="mb-1.5 block text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-              Tipo de macro
-            </span>
-            <FormSelect
-              value={draft.actionType}
-              onChange={(value) => {
-                if (value === "spell") {
-                  setSpellConfig((currentConfig) => currentConfig);
-                  return;
+      <div className="grid gap-5 grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+        <form className="min-w-0 space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="block">
+              <span className="mb-1.5 block text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                Nombre de la accion
+              </span>
+              <input
+                type="text"
+                value={draft.name}
+                onChange={(event) =>
+                  setDraft((currentDraft) => ({
+                    ...currentDraft,
+                    name: event.target.value,
+                  }))
                 }
+                className="w-full rounded-2xl px-4 py-3 text-sm"
+                placeholder="Ej. Espadazo giratorio o Proyectil magico"
+              />
+            </label>
 
-                setWeaponConfig((currentConfig) => currentConfig);
-              }}
-              options={ACTION_TYPE_OPTIONS}
-              ariaLabel="Tipo de accion"
-            />
-          </label>
-
-          {draft.actionType === "weapon" && currentWeaponConfig ? (
-            <>
-              <label className="block">
-                <span className="mb-1.5 block text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                  Fuente del arma
-                </span>
-                <FormSelect
-                  value={currentWeaponConfig.source}
-                  onChange={(value) =>
-                    setWeaponConfig((currentConfig) => {
-                      if (value === "equipped") {
-                        const weapon = equippedWeapons[0] ?? null;
-
-                        return {
-                          ...currentConfig,
-                          source: "equipped",
-                          selectedWeaponId: weapon?.id,
-                          weaponSnapshot: weapon
-                            ? getWeaponSnapshot(weapon)
-                            : currentConfig.weaponSnapshot,
-                        };
-                      }
-
-                      return {
-                        ...currentConfig,
-                        source: "improvised",
-                        selectedWeaponId: undefined,
-                        weaponSnapshot:
-                          currentConfig.source === "equipped"
-                            ? createEmptyWeaponSnapshot()
-                            : currentConfig.weaponSnapshot,
-                      };
-                    })
+            <label className="block">
+              <span className="mb-1.5 block text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                Tipo de macro
+              </span>
+              <FormSelect
+                value={draft.actionType}
+                onChange={(value) => {
+                  if (value === "spell") {
+                    setSpellConfig((currentConfig) => currentConfig);
+                    return;
                   }
-                  options={weaponSourceOptions}
-                  ariaLabel="Fuente del arma"
-                />
-              </label>
 
-              {currentWeaponConfig.source === "equipped" ? (
+                  setWeaponConfig((currentConfig) => currentConfig);
+                }}
+                options={ACTION_TYPE_OPTIONS}
+                ariaLabel="Tipo de accion"
+              />
+            </label>
+
+            {draft.actionType === "weapon" && currentWeaponConfig ? (
+              <>
                 <label className="block">
                   <span className="mb-1.5 block text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                    Arma equipada
+                    Fuente del arma
                   </span>
                   <FormSelect
-                    value={
-                      currentWeaponConfig.selectedWeaponId ??
-                      equippedWeapons[0]?.id ??
-                      ""
-                    }
+                    value={currentWeaponConfig.source}
                     onChange={(value) =>
                       setWeaponConfig((currentConfig) => {
-                        const weapon =
-                          equippedWeapons.find((item) => item.id === value) ??
-                          null;
+                        if (value === "equipped") {
+                          const weapon = equippedWeapons[0] ?? null;
 
-                        if (!weapon) {
-                          return currentConfig;
+                          return {
+                            ...currentConfig,
+                            source: "equipped",
+                            selectedWeaponId: weapon?.id,
+                            useCustomWeaponProfile: false,
+                            weaponSnapshot: weapon
+                              ? getWeaponSnapshot(weapon)
+                              : currentConfig.weaponSnapshot,
+                          };
                         }
 
                         return {
                           ...currentConfig,
-                          selectedWeaponId: weapon.id,
-                          weaponSnapshot: getWeaponSnapshot(weapon),
+                          source: "improvised",
+                          selectedWeaponId: undefined,
+                          useCustomWeaponProfile: false,
+                          weaponSnapshot:
+                            currentConfig.source === "equipped"
+                              ? createEmptyWeaponSnapshot()
+                              : currentConfig.weaponSnapshot,
                         };
                       })
                     }
-                    options={equippedWeaponOptions}
-                    placeholder="Selecciona un arma equipada"
-                    ariaLabel="Arma equipada"
-                    disabled={equippedWeapons.length === 0}
+                    options={weaponSourceOptions}
+                    ariaLabel="Fuente del arma"
                   />
                 </label>
-              ) : (
+
+                {currentWeaponConfig.source === "equipped" ? (
+                  <label className="block">
+                    <span className="mb-1.5 block text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                      Arma equipada
+                    </span>
+                    <FormSelect
+                      value={
+                        currentWeaponConfig.selectedWeaponId ??
+                        equippedWeapons[0]?.id ??
+                        ""
+                      }
+                      onChange={(value) =>
+                        setWeaponConfig((currentConfig) => {
+                          const weapon =
+                            equippedWeapons.find((item) => item.id === value) ??
+                            null;
+
+                          if (!weapon) {
+                            return currentConfig;
+                          }
+
+                          return {
+                            ...currentConfig,
+                            selectedWeaponId: weapon.id,
+                            weaponSnapshot: getWeaponSnapshot(weapon),
+                          };
+                        })
+                      }
+                      options={equippedWeaponOptions}
+                      placeholder="Selecciona un arma equipada"
+                      ariaLabel="Arma equipada"
+                      disabled={equippedWeapons.length === 0}
+                    />
+                  </label>
+                ) : null}
+              </>
+            ) : null}
+          </div>
+
+          {draft.actionType === "weapon" && currentWeaponConfig ? (
+            <>
+              {currentWeaponConfig.source === "improvised" ? (
                 <div className="rounded-2xl border border-border/60 bg-secondary/15 p-4">
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="block sm:col-span-2">
-                      <span className="mb-1.5 block text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-                        Nombre del arma improvisada
-                      </span>
-                      <input
-                        type="text"
-                        value={currentWeaponConfig.weaponSnapshot.name}
-                        onChange={(event) =>
-                          setWeaponConfig((currentConfig) => ({
-                            ...currentConfig,
-                            weaponSnapshot: {
-                              ...currentConfig.weaponSnapshot,
-                              name: event.target.value,
-                            },
-                          }))
-                        }
-                        className="w-full rounded-xl px-3 py-2 text-sm"
-                        placeholder="Ej. Silla rota o antorcha"
-                      />
-                    </label>
-
-                    <label className="block">
-                      <span className="mb-1.5 block text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-                        Cantidad de dados
-                      </span>
-                      <FormNumberInput
-                        value={
-                          currentWeaponConfig.weaponSnapshot.damageDiceCount
-                        }
-                        onChange={(value) =>
-                          setWeaponConfig((currentConfig) => ({
-                            ...currentConfig,
-                            weaponSnapshot: normalizeWeaponSnapshot({
-                              ...currentConfig.weaponSnapshot,
-                              damageDiceCount: Number.parseInt(value, 10) || 1,
-                            }),
-                          }))
-                        }
-                        min={1}
-                        className="w-full"
-                        inputClassName="rounded-xl px-3 py-2 text-center text-sm"
-                        ariaLabel="Cantidad de dados del arma improvisada"
-                      />
-                    </label>
-
-                    <label className="block">
-                      <span className="mb-1.5 block text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-                        Dado de dano
-                      </span>
-                      <FormSelect
-                        value={String(
-                          currentWeaponConfig.weaponSnapshot.damageDiceType,
-                        )}
-                        onChange={(value) =>
-                          setWeaponConfig((currentConfig) => ({
-                            ...currentConfig,
-                            weaponSnapshot: normalizeWeaponSnapshot({
-                              ...currentConfig.weaponSnapshot,
-                              damageDiceType: Number.parseInt(value, 10) || 6,
-                            }),
-                          }))
-                        }
-                        options={DAMAGE_DICE_OPTIONS}
-                        ariaLabel="Dado del arma improvisada"
-                      />
-                    </label>
-
-                    <label className="block">
-                      <span className="mb-1.5 block text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-                        Critico desde
-                      </span>
-                      <FormNumberInput
-                        value={
-                          currentWeaponConfig.weaponSnapshot.criticalRangeStart
-                        }
-                        onChange={(value) =>
-                          setWeaponConfig((currentConfig) => ({
-                            ...currentConfig,
-                            weaponSnapshot: normalizeWeaponSnapshot({
-                              ...currentConfig.weaponSnapshot,
-                              criticalRangeStart:
-                                Number.parseInt(value, 10) || 20,
-                            }),
-                          }))
-                        }
-                        min={1}
-                        max={20}
-                        className="w-full"
-                        inputClassName="rounded-xl px-3 py-2 text-center text-sm"
-                        ariaLabel="Rango critico"
-                      />
-                    </label>
-
-                    <label className="block">
-                      <span className="mb-1.5 block text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-                        Multiplicador critico
-                      </span>
-                      <FormNumberInput
-                        value={
-                          currentWeaponConfig.weaponSnapshot.criticalMultiplier
-                        }
-                        onChange={(value) =>
-                          setWeaponConfig((currentConfig) => ({
-                            ...currentConfig,
-                            weaponSnapshot: normalizeWeaponSnapshot({
-                              ...currentConfig.weaponSnapshot,
-                              criticalMultiplier:
-                                Number.parseInt(value, 10) || 2,
-                            }),
-                          }))
-                        }
-                        min={2}
-                        className="w-full"
-                        inputClassName="rounded-xl px-3 py-2 text-center text-sm"
-                        ariaLabel="Multiplicador critico"
-                      />
-                    </label>
-                  </div>
+                  <WeaponProfileEditor
+                    snapshot={currentWeaponConfig.weaponSnapshot}
+                    onChange={(weaponSnapshot) =>
+                      setWeaponConfig((currentConfig) => ({
+                        ...currentConfig,
+                        weaponSnapshot,
+                      }))
+                    }
+                    nameLabel="Nombre del arma improvisada"
+                    namePlaceholder="Ej. Silla rota o antorcha"
+                  />
                 </div>
-              )}
+              ) : null}
 
               <label className="block">
                 <span className="mb-1.5 block text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-                  Ataques o dados extra
+                  Ataques extra
                 </span>
                 <FormNumberInput
                   value={Math.max(
@@ -976,30 +1016,94 @@ export function BattleActionModal({
                   min={0}
                   className="w-full"
                   inputClassName="rounded-xl px-3 py-2 text-center text-sm"
-                  ariaLabel="Ataques o dados extra del arma"
+                  ariaLabel="Ataques extra del arma"
                 />
               </label>
 
-              <div className="rounded-2xl border border-border/60 bg-secondary/15 p-4 text-sm leading-6 text-muted-foreground">
-                <div className="text-[11px] uppercase tracking-[0.18em] text-gold/80">
-                  Perfil actual del arma
-                </div>
-                <div className="mt-2 text-foreground">
-                  {currentWeaponSnapshot?.name || "Arma sin nombre"}
-                </div>
-                <div className="mt-1">
-                  {(() => {
-                    const snapshot =
-                      currentWeaponSnapshot ?? createEmptyWeaponSnapshot();
-                    const criticalRange =
-                      snapshot.criticalRangeStart >= 20
-                        ? "20"
-                        : `${snapshot.criticalRangeStart}-20`;
+              {currentWeaponConfig.source === "equipped" ? (
+                <div className="rounded-2xl border border-border/60 bg-secondary/15 p-4 text-sm leading-6 text-muted-foreground">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <div className="text-[11px] uppercase tracking-[0.18em] text-gold/80">
+                        Perfil del arma para esta macro
+                      </div>
+                      <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
+                        Puedes dejar el perfil vinculado al arma equipada o
+                        sobrescribirlo solo para esta macro.
+                      </p>
+                    </div>
 
-                    return `${effectiveWeaponDiceCount}d${snapshot.damageDiceType} | Critico ${criticalRange}/x${snapshot.criticalMultiplier}`;
-                  })()}
+                    {currentWeaponConfig.useCustomWeaponProfile ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setWeaponConfig((currentConfig) => ({
+                            ...currentConfig,
+                            useCustomWeaponProfile: false,
+                            weaponSnapshot:
+                              equippedWeaponSnapshot ??
+                              currentConfig.weaponSnapshot,
+                          }))
+                        }
+                        className="rounded-full border border-border/60 bg-background/20 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-gold/45 hover:text-foreground"
+                      >
+                        Resetear al arma equipada
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setWeaponConfig((currentConfig) => ({
+                            ...currentConfig,
+                            useCustomWeaponProfile: true,
+                            weaponSnapshot:
+                              currentWeaponSnapshot ??
+                              currentConfig.weaponSnapshot,
+                          }))
+                        }
+                        className="rounded-full border border-gold/35 bg-gold/10 px-3 py-1.5 text-xs text-gold transition-colors hover:bg-gold/15"
+                      >
+                        Editar perfil para esta macro
+                      </button>
+                    )}
+                  </div>
+
+                  {currentWeaponConfig.useCustomWeaponProfile ? (
+                    <div className="mt-4">
+                      <WeaponProfileEditor
+                        snapshot={currentWeaponConfig.weaponSnapshot}
+                        onChange={(weaponSnapshot) =>
+                          setWeaponConfig((currentConfig) => ({
+                            ...currentConfig,
+                            weaponSnapshot,
+                          }))
+                        }
+                        nameLabel="Nombre del arma en esta macro"
+                        namePlaceholder="Ej. Espada corta con veneno"
+                      />
+                    </div>
+                  ) : (
+                    <>
+                      <div className="mt-3 text-foreground">
+                        {currentWeaponSnapshot?.name || "Arma sin nombre"}
+                      </div>
+                      <div className="mt-1">
+                        {(() => {
+                          const snapshot =
+                            currentWeaponSnapshot ??
+                            createEmptyWeaponSnapshot();
+                          const criticalRange =
+                            snapshot.criticalRangeStart >= 20
+                              ? "20"
+                              : `${snapshot.criticalRangeStart}-20`;
+
+                          return `${effectiveWeaponDiceCount}d${snapshot.damageDiceType} | Critico ${criticalRange}/x${snapshot.criticalMultiplier}`;
+                        })()}
+                      </div>
+                    </>
+                  )}
                 </div>
-              </div>
+              ) : null}
             </>
           ) : null}
 
@@ -1068,9 +1172,9 @@ export function BattleActionModal({
               placeholder="Alcance, condiciones, texto de conjuro, observaciones tacticas..."
             />
           </label>
-        </div>
+        </form>
 
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           {draft.actionType === "weapon" && currentWeaponConfig ? (
             <>
               <ModifierListEditor

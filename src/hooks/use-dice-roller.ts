@@ -12,6 +12,8 @@ export interface DiceRollOptions {
   highlightOutcome?: boolean;
   presetRolls?: number[];
   selectedRollIndex?: number;
+  chipValues?: number[];
+  criticalThreatRangeStart?: number;
 }
 
 export interface DiceRollResult {
@@ -19,6 +21,8 @@ export interface DiceRollResult {
   total: number;
   diceType: number;
   rolls: number[];
+  chipValues?: number[];
+  criticalThreatRangeStart?: number;
   selectedRollIndex: number;
   rollMode: DiceRollMode;
   modifierBreakdown: DiceModifier[];
@@ -94,6 +98,11 @@ export function useDiceRoller() {
           total: roll + modifierTotal,
           diceType,
           rolls,
+          chipValues:
+            options.chipValues && options.chipValues.length === rolls.length
+              ? [...options.chipValues]
+              : undefined,
+          criticalThreatRangeStart: options.criticalThreatRangeStart,
           selectedRollIndex,
           rollMode,
           modifierBreakdown: modifiers,

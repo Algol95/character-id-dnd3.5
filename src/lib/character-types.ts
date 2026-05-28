@@ -102,6 +102,7 @@ export interface WeaponAttackConfig {
   source: "equipped" | "improvised";
   selectedWeaponId?: string;
   weaponSnapshot: BattleActionWeaponSnapshot;
+  useCustomWeaponProfile?: boolean;
   extraDamageDiceCount?: number;
   attackModifiers: BattleActionModifier[];
   damageModifiers: BattleActionModifier[];
