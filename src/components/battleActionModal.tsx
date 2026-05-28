@@ -4,7 +4,10 @@ import { FormSelect, type FormSelectOption } from "@/components/formSelect";
 import { Modal } from "./modal";
 import { DAMAGE_DICE_TYPES, DiceIcon } from "./diceIcon";
 import {
+  DAMAGE_TYPE_LABELS,
+  DAMAGE_TYPE_OPTIONS,
   type BattleActionModifierApplication,
+  type DamageType,
   formatModifier,
   getAbilityModifier,
   type Attack,
@@ -79,6 +82,14 @@ const DAMAGE_DICE_OPTIONS: FormSelectOption[] = DAMAGE_DICE_TYPES.map(
   }),
 );
 
+const DAMAGE_TYPE_SELECT_OPTIONS: FormSelectOption[] = [
+  { value: "", label: "Sin especificar" },
+  ...DAMAGE_TYPE_OPTIONS.map((damageType) => ({
+    value: damageType.value,
+    label: damageType.label,
+  })),
+];
+
 function createBattleActionId(prefix = "battle") {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return `${prefix}-${crypto.randomUUID()}`;
@@ -101,6 +112,7 @@ function createDefaultSpellConfig() {
   return {
     damageDiceCount: 1,
     damageDiceType: 6,
+    damageType: undefined,
     effectModifiers: [],
   };
 }
@@ -145,6 +157,7 @@ function cloneAction(action: Attack): Attack {
           ...action.spellConfig,
           damageDiceCount: action.spellConfig.damageDiceCount,
           damageDiceType: action.spellConfig.damageDiceType,
+          damageType: action.spellConfig.damageType,
           effectModifiers:
             action.spellConfig.effectModifiers.map(cloneModifier),
         }
@@ -244,6 +257,7 @@ function createEmptyAction(firstWeapon: EquippedItem | null): Attack {
         source: "equipped",
         selectedWeaponId: firstWeapon.id,
         weaponSnapshot: getWeaponSnapshot(firstWeapon),
+        damageType: undefined,
         useCustomWeaponProfile: false,
         extraDamageDiceCount: 0,
         attackModifiers: [],
@@ -260,6 +274,7 @@ function createEmptyAction(firstWeapon: EquippedItem | null): Attack {
     weaponConfig: {
       source: "improvised",
       weaponSnapshot: createEmptyWeaponSnapshot(),
+      damageType: undefined,
       useCustomWeaponProfile: false,
       extraDamageDiceCount: 0,
       attackModifiers: [],
@@ -694,6 +709,7 @@ export function BattleActionModal({
           weaponSnapshot: equippedWeapons[0]
             ? getWeaponSnapshot(equippedWeapons[0])
             : createEmptyWeaponSnapshot(),
+          damageType: undefined,
           useCustomWeaponProfile: false,
           extraDamageDiceCount: 0,
           attackModifiers: [],
@@ -736,6 +752,7 @@ export function BattleActionModal({
         spellConfig: {
           damageDiceCount: Math.max(1, spellConfig.damageDiceCount),
           damageDiceType: spellConfig.damageDiceType,
+          damageType: spellConfig.damageType,
           effectModifiers: spellConfig.effectModifiers.map((modifier) => {
             const normalizedModifier = normalizeModifier(modifier);
 
@@ -786,6 +803,7 @@ export function BattleActionModal({
             ? (equippedWeapon?.id ?? baseWeaponConfig.selectedWeaponId)
             : undefined,
         weaponSnapshot: normalizedSnapshot,
+        damageType: baseWeaponConfig.damageType,
         useCustomWeaponProfile:
           baseWeaponConfig.source === "equipped"
             ? Boolean(baseWeaponConfig.useCustomWeaponProfile)
@@ -973,6 +991,26 @@ export function BattleActionModal({
                     />
                   </label>
                 ) : null}
+
+                <label className="block">
+                  <span className="mb-1.5 block text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                    Tipo de dano
+                  </span>
+                  <FormSelect
+                    value={currentWeaponConfig.damageType ?? ""}
+                    onChange={(value) =>
+                      setWeaponConfig((currentConfig) => ({
+                        ...currentConfig,
+                        damageType:
+                          value.trim().length > 0
+                            ? (value as DamageType)
+                            : undefined,
+                      }))
+                    }
+                    options={DAMAGE_TYPE_SELECT_OPTIONS}
+                    ariaLabel="Tipo de dano del arma"
+                  />
+                </label>
               </>
             ) : null}
           </div>
@@ -1096,8 +1134,11 @@ export function BattleActionModal({
                             snapshot.criticalRangeStart >= 20
                               ? "20"
                               : `${snapshot.criticalRangeStart}-20`;
+                          const damageTypeLabel = currentWeaponConfig.damageType
+                            ? DAMAGE_TYPE_LABELS[currentWeaponConfig.damageType]
+                            : null;
 
-                          return `${effectiveWeaponDiceCount}d${snapshot.damageDiceType} | Critico ${criticalRange}/x${snapshot.criticalMultiplier}`;
+                          return `${effectiveWeaponDiceCount}d${snapshot.damageDiceType}${damageTypeLabel ? ` | ${damageTypeLabel}` : ""} | Critico ${criticalRange}/x${snapshot.criticalMultiplier}`;
                         })()}
                       </div>
                     </>
@@ -1144,6 +1185,26 @@ export function BattleActionModal({
                       }
                       options={DAMAGE_DICE_OPTIONS}
                       ariaLabel="Dado del hechizo"
+                    />
+                  </label>
+
+                  <label className="block sm:col-span-2">
+                    <span className="mb-1.5 block text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                      Tipo de dano
+                    </span>
+                    <FormSelect
+                      value={currentSpellConfig.damageType ?? ""}
+                      onChange={(value) =>
+                        setSpellConfig((currentConfig) => ({
+                          ...currentConfig,
+                          damageType:
+                            value.trim().length > 0
+                              ? (value as DamageType)
+                              : undefined,
+                        }))
+                      }
+                      options={DAMAGE_TYPE_SELECT_OPTIONS}
+                      ariaLabel="Tipo de dano del hechizo"
                     />
                   </label>
                 </div>

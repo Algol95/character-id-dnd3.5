@@ -12,8 +12,10 @@ export interface DiceRollOptions {
   highlightOutcome?: boolean;
   presetRolls?: number[];
   selectedRollIndex?: number;
+  selectedRollIndexes?: number[];
   chipValues?: number[];
   chipTones?: Array<"default" | "critical" | "fumble">;
+  chipAttackIndexes?: number[];
   criticalThreatRangeStart?: number;
   actionId?: string;
 }
@@ -23,8 +25,10 @@ export interface DiceRollResult {
   total: number;
   diceType: number;
   rolls: number[];
+  selectedRollIndexes?: number[];
   chipValues?: number[];
   chipTones?: Array<"default" | "critical" | "fumble">;
+  chipAttackIndexes?: number[];
   criticalThreatRangeStart?: number;
   actionId?: string;
   rollInstanceId: number;
@@ -105,6 +109,11 @@ export function useDiceRoller() {
           total: roll + modifierTotal,
           diceType,
           rolls,
+          selectedRollIndexes:
+            options.selectedRollIndexes &&
+            options.selectedRollIndexes.length > 0
+              ? [...options.selectedRollIndexes]
+              : undefined,
           chipValues:
             options.chipValues && options.chipValues.length === rolls.length
               ? [...options.chipValues]
@@ -112,6 +121,11 @@ export function useDiceRoller() {
           chipTones:
             options.chipTones && options.chipTones.length === rolls.length
               ? [...options.chipTones]
+              : undefined,
+          chipAttackIndexes:
+            options.chipAttackIndexes &&
+            options.chipAttackIndexes.length === rolls.length
+              ? [...options.chipAttackIndexes]
               : undefined,
           criticalThreatRangeStart: options.criticalThreatRangeStart,
           actionId: options.actionId,

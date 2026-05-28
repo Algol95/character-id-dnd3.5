@@ -485,11 +485,26 @@ export function DiceRollModal({
       : [];
   const showOutcomeMessage =
     hasCriticalOutcome(result) || hasFumbleOutcome(result);
+  const selectedRollIndexes =
+    result?.selectedRollIndexes && result.selectedRollIndexes.length > 0
+      ? result.selectedRollIndexes
+      : result
+        ? [result.selectedRollIndex]
+        : [];
+
+  const isSelectedRoll = (rollIndex: number) =>
+    selectedRollIndexes.includes(rollIndex);
+
+  const isCriticalRelevantRoll = (rollIndex: number) =>
+    result?.rollMode === "normal" ? true : isSelectedRoll(rollIndex);
 
   const isNaturalCriticalRoll = (rollIndex: number) =>
-    result?.diceType === 20 && (result.rolls[rollIndex] ?? 0) === 20;
+    result?.diceType === 20 &&
+    isCriticalRelevantRoll(rollIndex) &&
+    (result.rolls[rollIndex] ?? 0) === 20;
 
   const isThreatenedRoll = (rollIndex: number) =>
+    isCriticalRelevantRoll(rollIndex) &&
     threatenedRollIndexes.includes(rollIndex);
 
   const handleConfirmationDecisionChange = (
@@ -530,19 +545,25 @@ export function DiceRollModal({
             return indexes;
           }, [])
         : [];
+    const selectedRollIndexes =
+      result.selectedRollIndexes && result.selectedRollIndexes.length > 0
+        ? result.selectedRollIndexes
+        : [result.selectedRollIndex];
+    const isCriticalRelevantRoll = (rollIndex: number) =>
+      result.rollMode === "normal" || selectedRollIndexes.includes(rollIndex);
     const naturalCriticalIndexes = result.rolls.reduce<number[]>(
       (indexes, rollValue, index) => {
-        if (rollValue === 20) {
-          indexes.push(index);
+        if (rollValue === 20 && isCriticalRelevantRoll(index)) {
+          indexes.push(result.chipAttackIndexes?.[index] ?? index);
         }
 
         return indexes;
       },
       [],
     );
-    const confirmedThreatIndexes = threatenedRollIndexes.filter(
-      (rollIndex) => confirmationDecisions[rollIndex] === "confirmed",
-    );
+    const confirmedThreatIndexes = threatenedRollIndexes
+      .filter((rollIndex) => confirmationDecisions[rollIndex] === "confirmed")
+      .map((rollIndex) => result.chipAttackIndexes?.[rollIndex] ?? rollIndex);
     const criticalAttackIndexes = [
       ...new Set([...naturalCriticalIndexes, ...confirmedThreatIndexes]),
     ].sort((left, right) => left - right);
@@ -552,9 +573,13 @@ export function DiceRollModal({
     confirmationDecisions,
     onAttackCriticalStateChange,
     result?.actionId,
+    result?.chipAttackIndexes,
     result?.criticalThreatRangeStart,
     result?.diceType,
+    result?.rollMode,
     result?.rolls,
+    result?.selectedRollIndex,
+    result?.selectedRollIndexes,
   ]);
 
   if (typeof document === "undefined" || !showResult) return null;
@@ -569,7 +594,7 @@ export function DiceRollModal({
     const currentRoll = result?.rolls[rollIndex] ?? 0;
     const diceType = result?.diceType ?? 0;
 
-    if (diceType === 20 && currentRoll === 20) {
+    if (diceType === 20 && isNaturalCriticalRoll(rollIndex)) {
       return "critical" as const;
     }
 
@@ -661,7 +686,7 @@ export function DiceRollModal({
                       ? rollValue
                       : undefined
                   }
-                  isSelected={index === result.selectedRollIndex}
+                  isSelected={isSelectedRoll(index)}
                   tone={getRollChipTone(index)}
                 />
                 {renderCriticalInteraction(index)}

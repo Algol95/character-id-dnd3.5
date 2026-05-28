@@ -1,8 +1,11 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { BattleActionModal } from "./battleActionModal";
 import { DiceButton } from "./diceButton";
+import { FormCheckbox } from "./formCheckbox";
 import { SectionShell } from "./sectionShell";
+import type { DiceRollMode } from "@/hooks/use-dice-roller";
 import {
+  DAMAGE_TYPE_LABELS,
   formatModifier,
   getAbilityModifier,
   type Attack,
@@ -23,6 +26,7 @@ interface AttacksProps {
     modifiers: { label: string; value: number }[],
     diceCount?: number,
     criticalThreatRangeStart?: number,
+    mode?: DiceRollMode,
   ) => void;
   onRollDamage: (
     attackName: string,
@@ -93,6 +97,9 @@ export function Attacks({
   const [editingActionId, setEditingActionId] = useState<string | "new" | null>(
     null,
   );
+  const [attackRollModes, setAttackRollModes] = useState<
+    Record<string, DiceRollMode>
+  >({});
 
   const actionBeingEdited = useMemo(
     () =>
@@ -334,6 +341,26 @@ export function Attacks({
     onChange({
       attacks: character.attacks.filter((attack) => attack.id !== attackId),
     });
+
+    setAttackRollModes((currentModes) => {
+      if (!(attackId in currentModes)) {
+        return currentModes;
+      }
+
+      const nextModes = { ...currentModes };
+      delete nextModes[attackId];
+      return nextModes;
+    });
+  };
+
+  const handleAttackRollModeToggle = (
+    attackId: string,
+    nextMode: Extract<DiceRollMode, "advantage" | "disadvantage">,
+  ) => {
+    setAttackRollModes((currentModes) => ({
+      ...currentModes,
+      [attackId]: currentModes[attackId] === nextMode ? "normal" : nextMode,
+    }));
   };
 
   return (
@@ -368,6 +395,8 @@ export function Attacks({
             const hasCriticalDamageState = criticalAttackIndexes.length > 0;
             const effectiveWeaponDiceCount =
               getEffectiveWeaponDiceCount(attack);
+            const selectedAttackRollMode =
+              attackRollModes[attack.id] ?? "normal";
             const criticalRange = weaponSnapshot
               ? weaponSnapshot.criticalRangeStart >= 20
                 ? "20"
@@ -397,8 +426,12 @@ export function Attacks({
                         <>
                           <div>
                             {weaponSnapshot.name} · {effectiveWeaponDiceCount}d
-                            {weaponSnapshot.damageDiceType} · Critico{" "}
-                            {criticalRange}/x{weaponSnapshot.criticalMultiplier}
+                            {weaponSnapshot.damageDiceType}
+                            {attack.weaponConfig?.damageType
+                              ? ` · ${DAMAGE_TYPE_LABELS[attack.weaponConfig.damageType]}`
+                              : ""}{" "}
+                            · Critico {criticalRange}/x
+                            {weaponSnapshot.criticalMultiplier}
                           </div>
                           <div>
                             Ataque {formatModifier(attackBonusTotal)}
@@ -415,12 +448,48 @@ export function Attacks({
                                 )})`
                               : ""}
                           </div>
+                          <div className="flex flex-wrap items-center gap-3 pt-1 text-xs">
+                            <FormCheckbox
+                              checked={selectedAttackRollMode === "advantage"}
+                              onChange={() =>
+                                handleAttackRollModeToggle(
+                                  attack.id,
+                                  "advantage",
+                                )
+                              }
+                              ariaLabel={`Activar ventaja para ${attack.name}`}
+                              label="Ventaja"
+                              className="w-auto items-center gap-2"
+                              boxClassName="h-3.5 w-3.5 rounded border-success/60 bg-background/40 text-success group-hover:border-success/50 peer-checked:border-success/65 peer-checked:bg-success/14 peer-checked:text-success peer-checked:shadow-[0_0_10px_rgba(34,197,94,0.22)] peer-focus-visible:ring-success"
+                              labelClassName="text-xs font-medium text-success"
+                            />
+
+                            <FormCheckbox
+                              checked={
+                                selectedAttackRollMode === "disadvantage"
+                              }
+                              onChange={() =>
+                                handleAttackRollModeToggle(
+                                  attack.id,
+                                  "disadvantage",
+                                )
+                              }
+                              ariaLabel={`Activar desventaja para ${attack.name}`}
+                              label="Desventaja"
+                              className="w-auto items-center gap-2"
+                              boxClassName="h-3.5 w-3.5 rounded border-blood-red/60 bg-background/40 text-blood-red group-hover:border-blood-red/50 peer-checked:border-blood-red/65 peer-checked:bg-blood-red/14 peer-checked:text-blood-red peer-checked:shadow-[0_0_10px_rgba(127,29,29,0.2)] peer-focus-visible:ring-blood-red"
+                              labelClassName="text-xs font-medium text-blood-red"
+                            />
+                          </div>
                         </>
                       ) : null}
 
                       {attack.actionType === "spell" ? (
                         <div>
                           Tirada {getSpellExpression(attack)}
+                          {attack.spellConfig?.damageType
+                            ? ` · ${DAMAGE_TYPE_LABELS[attack.spellConfig.damageType]}`
+                            : ""}
                           {spellBonusSummary.total !== 0 ||
                           spellBonusSummary.perDie !== 0
                             ? ` · Ajustes ${formatModifierSummary(
@@ -450,6 +519,7 @@ export function Attacks({
                                 ) ?? [],
                                 weaponAttackCount,
                                 weaponSnapshot?.criticalRangeStart,
+                                selectedAttackRollMode,
                               )
                             }
                             size="md"

@@ -76,6 +76,44 @@ export interface WeaponProfile {
   criticalMultiplier: number;
 }
 
+export const DAMAGE_TYPE_OPTIONS = [
+  { value: "bludgeoning", label: "Contundente" },
+  { value: "slashing", label: "Cortante" },
+  { value: "piercing", label: "Perforante" },
+  { value: "acid", label: "Acido" },
+  { value: "cold", label: "Frio" },
+  { value: "electricity", label: "Electricidad" },
+  { value: "fire", label: "Fuego" },
+  { value: "sonic", label: "Sonico" },
+  { value: "force", label: "Fuerza" },
+  { value: "positive", label: "Energia positiva" },
+  { value: "negative", label: "Energia negativa" },
+  { value: "sacred", label: "Sagrado" },
+  { value: "profane", label: "Profano" },
+  { value: "divine", label: "Divino" },
+  { value: "necrotic", label: "Necrotico" },
+] as const;
+
+export type DamageType = (typeof DAMAGE_TYPE_OPTIONS)[number]["value"];
+
+export const DAMAGE_TYPE_LABELS: Record<DamageType, string> = {
+  bludgeoning: "Contundente",
+  slashing: "Cortante",
+  piercing: "Perforante",
+  acid: "Acido",
+  cold: "Frio",
+  electricity: "Electricidad",
+  fire: "Fuego",
+  sonic: "Sonico",
+  force: "Fuerza",
+  positive: "Energia positiva",
+  negative: "Energia negativa",
+  sacred: "Sagrado",
+  profane: "Profano",
+  divine: "Divino",
+  necrotic: "Necrotico",
+};
+
 export type BattleActionType = "weapon" | "spell";
 
 export type BattleActionModifierSource =
@@ -102,6 +140,7 @@ export interface WeaponAttackConfig {
   source: "equipped" | "improvised";
   selectedWeaponId?: string;
   weaponSnapshot: BattleActionWeaponSnapshot;
+  damageType?: DamageType;
   useCustomWeaponProfile?: boolean;
   extraDamageDiceCount?: number;
   attackModifiers: BattleActionModifier[];
@@ -111,6 +150,7 @@ export interface WeaponAttackConfig {
 export interface SpellAttackConfig {
   damageDiceCount: number;
   damageDiceType: number;
+  damageType?: DamageType;
   effectModifiers: BattleActionModifier[];
 }
 

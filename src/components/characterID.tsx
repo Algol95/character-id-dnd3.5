@@ -233,6 +233,7 @@ function normalizeStoredAttack(
               parseDamageRoll(legacySpellExpression)?.numDice ?? 1,
             damageDiceType:
               parseDamageRoll(legacySpellExpression)?.diceType ?? 6,
+            damageType: storedAttack.spellConfig.damageType,
             effectModifiers: storedAttack.spellConfig.effectModifiers ?? [],
           }
         : {
@@ -241,6 +242,7 @@ function normalizeStoredAttack(
               storedAttack.spellConfig.damageDiceCount ?? 1,
             ),
             damageDiceType: storedAttack.spellConfig.damageDiceType ?? 6,
+            damageType: storedAttack.spellConfig.damageType,
             effectModifiers: storedAttack.spellConfig.effectModifiers ?? [],
           }
       : undefined;
@@ -446,6 +448,7 @@ export function CharacterId() {
       modifiers: RollModifier[],
       diceCount = 1,
       criticalThreatRangeStart?: number,
+      mode: DiceRollMode = "normal",
     ) => {
       if (actionId) {
         setWeaponCriticalStates((currentStates) => {
@@ -459,7 +462,11 @@ export function CharacterId() {
         });
       }
 
-      if (diceCount <= 1 && criticalThreatRangeStart === undefined) {
+      if (
+        diceCount <= 1 &&
+        criticalThreatRangeStart === undefined &&
+        mode === "normal"
+      ) {
         handleRoll(label, modifiers);
         return;
       }
@@ -468,19 +475,61 @@ export function CharacterId() {
         (sum, modifier) => sum + modifier.value,
         0,
       );
-      const attackRolls = Array.from(
-        { length: diceCount },
-        () => Math.floor(Math.random() * 20) + 1,
-      );
+      const shouldPairRolls = mode !== "normal";
+      const attackRolls = shouldPairRolls
+        ? Array.from({ length: diceCount }, () => [
+            Math.floor(Math.random() * 20) + 1,
+            Math.floor(Math.random() * 20) + 1,
+          ]).flat()
+        : Array.from(
+            { length: diceCount },
+            () => Math.floor(Math.random() * 20) + 1,
+          );
+      const selectedRollIndexes = shouldPairRolls
+        ? Array.from({ length: diceCount }, (_, attackIndex) => {
+            const leftIndex = attackIndex * 2;
+            const rightIndex = leftIndex + 1;
+            const leftRoll = attackRolls[leftIndex] ?? 0;
+            const rightRoll = attackRolls[rightIndex] ?? 0;
 
-      setRollLabel(diceCount > 1 ? `${label} (${diceCount} ataques)` : label);
+            return mode === "advantage"
+              ? leftRoll >= rightRoll
+                ? leftIndex
+                : rightIndex
+              : leftRoll <= rightRoll
+                ? leftIndex
+                : rightIndex;
+          })
+        : [0];
+      const labelDetails = [
+        diceCount > 1 ? `${diceCount} ataques` : null,
+        mode === "advantage"
+          ? "ventaja"
+          : mode === "disadvantage"
+            ? "desventaja"
+            : null,
+      ].filter((detail): detail is string => Boolean(detail));
+
+      setRollLabel(
+        labelDetails.length > 0
+          ? `${label} (${labelDetails.join(", ")})`
+          : label,
+      );
       rollDice(20, modifiers, {
         highlightOutcome: criticalThreatRangeStart === undefined,
         presetRolls: attackRolls,
         chipValues: attackRolls.map((roll) => roll + modifierTotal),
+        chipAttackIndexes: shouldPairRolls
+          ? Array.from({ length: diceCount }, (_, attackIndex) => [
+              attackIndex,
+              attackIndex,
+            ]).flat()
+          : Array.from({ length: diceCount }, (_, attackIndex) => attackIndex),
         criticalThreatRangeStart,
         actionId,
-        selectedRollIndex: 0,
+        mode,
+        selectedRollIndex: selectedRollIndexes[0] ?? 0,
+        selectedRollIndexes: shouldPairRolls ? selectedRollIndexes : undefined,
       });
     },
     [handleRoll, rollDice],
@@ -629,7 +678,7 @@ export function CharacterId() {
           const isCriticalGroup = groupMultiplier > 1;
 
           return groupRolls.map((roll) => ({
-            value: roll * groupMultiplier + perDieBonus,
+            value: roll * groupMultiplier + perDieBonus + totalBonus,
             tone: isCriticalGroup
               ? ("critical" as const)
               : ("default" as const),
@@ -682,7 +731,7 @@ export function CharacterId() {
         highlightOutcome: false,
         presetRolls: baseRolls,
         chipValues:
-          perDieBonus !== 0 || hasCriticalGroups
+          perDieBonus !== 0 || totalBonus !== 0 || hasCriticalGroups
             ? chipMetadata.map((chip) => chip.value)
             : undefined,
         chipTones: hasCriticalGroups
