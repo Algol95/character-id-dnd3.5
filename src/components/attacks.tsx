@@ -59,14 +59,12 @@ interface AttacksProps {
 function MacroActionButton({
   onClick,
   title,
-  label,
-  tone = "accent",
+  tone = "spell",
   children,
 }: {
   onClick: () => void;
   title: string;
-  label: string;
-  tone?: "accent" | "critical" | "success";
+  tone?: "weapon" | "spell" | "critical" | "success";
   children: ReactNode;
 }) {
   const toneClasses =
@@ -74,21 +72,20 @@ function MacroActionButton({
       ? "border-blood-red/45 bg-blood-red/12 text-blood-red hover:bg-blood-red/22 hover:shadow-[0_0_10px_rgba(153,27,27,0.32)]"
       : tone === "success"
         ? "border-critical/50 bg-critical/12 text-critical hover:bg-critical/18 hover:shadow-[0_0_12px_color-mix(in_oklab,var(--critical)_35%,transparent)]"
-        : "border-accent/50 bg-accent/20 text-accent hover:border-accent hover:bg-accent/40 hover:shadow-[0_0_10px_var(--accent)]";
+        : tone === "weapon"
+          ? "border-[rgba(216,76,76,0.55)] bg-[rgba(216,76,76,0.16)] text-[rgb(244,120,120)] hover:bg-[rgba(216,76,76,0.26)] hover:shadow-[0_0_12px_rgba(216,76,76,0.28)]"
+          : "border-[rgba(88,157,255,0.55)] bg-[rgba(88,157,255,0.16)] text-[rgb(124,181,255)] hover:bg-[rgba(88,157,255,0.24)] hover:shadow-[0_0_12px_rgba(88,157,255,0.28)]";
 
   return (
-    <div className="flex flex-col items-center gap-1">
-      <button
-        type="button"
-        onClick={onClick}
-        className={`flex h-8 w-8 items-center justify-center rounded border transition-all duration-200 active:scale-95 ${toneClasses}`}
-        title={title}
-        aria-label={title}
-      >
-        {children}
-      </button>
-      <span className="text-xs text-muted-foreground">{label}</span>
-    </div>
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex h-8 w-8 items-center justify-center rounded border transition-all duration-200 active:scale-95 ${toneClasses}`}
+      title={title}
+      aria-label={title}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -103,9 +100,9 @@ function MacroInfoChip({
 }) {
   const toneClasses =
     tone === "weapon"
-      ? "border-gold/20 bg-gold/6 text-foreground"
+      ? "border-[rgba(216,76,76,0.28)] bg-[rgba(216,76,76,0.1)] text-foreground"
       : tone === "spell"
-        ? "border-accent/22 bg-accent/8 text-foreground"
+        ? "border-[rgba(88,157,255,0.3)] bg-[rgba(88,157,255,0.1)] text-foreground"
         : "border-border/50 bg-background/20 text-foreground";
 
   return (
@@ -162,8 +159,8 @@ function MacroCollapseButton({
 }) {
   const toneClasses =
     tone === "weapon"
-      ? "border-gold/25 bg-gold/8 text-gold hover:bg-gold/12"
-      : "border-accent/28 bg-accent/10 text-accent hover:bg-accent/14";
+      ? "border-[rgba(216,76,76,0.35)] bg-[rgba(216,76,76,0.12)] text-[rgb(244,120,120)] hover:bg-[rgba(216,76,76,0.18)]"
+      : "border-[rgba(88,157,255,0.38)] bg-[rgba(88,157,255,0.12)] text-[rgb(124,181,255)] hover:bg-[rgba(88,157,255,0.18)]";
 
   return (
     <button
@@ -200,8 +197,8 @@ function MacroBodyPanel({
 }) {
   const toneClasses =
     tone === "weapon"
-      ? "border-gold/18 bg-black/10"
-      : "border-accent/18 bg-black/10";
+      ? "border-[rgba(216,76,76,0.22)] bg-[rgba(22,8,8,0.52)]"
+      : "border-[rgba(88,157,255,0.24)] bg-[rgba(10,18,32,0.5)]";
 
   return (
     <div className={`space-y-3 rounded-[22px] border p-4 ${toneClasses}`}>
@@ -218,7 +215,8 @@ function MacroCard({
   headerChips,
   details,
   notes,
-  actions,
+  actionStart,
+  actionEnd,
   collapsed,
   onToggle,
 }: {
@@ -229,26 +227,31 @@ function MacroCard({
   headerChips: ReactNode;
   details: ReactNode;
   notes: ReactNode;
-  actions: ReactNode;
+  actionStart: ReactNode;
+  actionEnd: ReactNode;
   collapsed: boolean;
   onToggle: () => void;
 }) {
   const cardToneClasses =
     tone === "weapon"
-      ? "border-gold/22 bg-[linear-gradient(180deg,rgba(37,30,22,0.96)_0%,rgba(23,18,14,0.98)_100%)] shadow-[0_10px_26px_rgba(212,175,55,0.06)]"
-      : "border-accent/24 bg-[linear-gradient(180deg,rgba(40,24,24,0.96)_0%,rgba(23,18,18,0.98)_100%)] shadow-[0_10px_26px_rgba(190,92,52,0.08)]";
+      ? "border-[rgba(216,76,76,0.28)] bg-[linear-gradient(180deg,rgba(46,16,16,0.96)_0%,rgba(24,10,10,0.98)_100%)] shadow-[0_10px_26px_rgba(216,76,76,0.14)]"
+      : "border-[rgba(88,157,255,0.3)] bg-[linear-gradient(180deg,rgba(16,30,52,0.96)_0%,rgba(10,18,32,0.98)_100%)] shadow-[0_10px_26px_rgba(88,157,255,0.16)]";
   const iconShellClasses =
     tone === "weapon"
-      ? "border-gold/30 bg-gold/10 text-gold"
-      : "border-accent/32 bg-accent/10 text-accent";
+      ? "border-[rgba(216,76,76,0.38)] bg-[rgba(216,76,76,0.12)] text-[rgb(244,120,120)]"
+      : "border-[rgba(88,157,255,0.4)] bg-[rgba(88,157,255,0.12)] text-[rgb(124,181,255)]";
   const actionPanelClasses =
     tone === "weapon"
-      ? "border-gold/14 bg-background/12"
-      : "border-accent/16 bg-background/12";
+      ? "border-[rgba(216,76,76,0.18)] bg-[rgba(36,12,12,0.34)]"
+      : "border-[rgba(88,157,255,0.2)] bg-[rgba(14,24,40,0.34)]";
   const notePanelClasses =
     tone === "weapon"
-      ? "border-gold/12 bg-black/8"
-      : "border-accent/14 bg-black/8";
+      ? "border-[rgba(216,76,76,0.18)] bg-[rgba(16,7,7,0.4)]"
+      : "border-[rgba(88,157,255,0.2)] bg-[rgba(8,15,28,0.42)]";
+  const subtitleClasses =
+    tone === "weapon"
+      ? "text-[rgb(244,120,120)]/80"
+      : "text-[rgb(124,181,255)]/80";
   const detailsPanelRef = useRef<HTMLDivElement | null>(null);
   const [detailsPanelHeight, setDetailsPanelHeight] = useState<number | null>(
     null,
@@ -319,9 +322,6 @@ function MacroCard({
 
             <div className="min-w-0">
               <h4 className="text-lg font-semibold text-foreground">{title}</h4>
-              <div className="mt-1 text-xs uppercase tracking-[0.16em] text-muted-foreground/85">
-                {subtitle}
-              </div>
             </div>
           </div>
 
@@ -367,9 +367,17 @@ function MacroCard({
         </div>
 
         <div
-          className={`flex flex-wrap items-center justify-between gap-3 rounded-[18px] border px-3 py-2 ${actionPanelClasses}`}
+          className={`grid gap-3 rounded-[18px] border px-3 py-2 md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center ${actionPanelClasses}`}
         >
-          {actions}
+          <div className="flex flex-wrap items-center gap-2">{actionStart}</div>
+
+          <div
+            className={`text-center text-[10px] uppercase tracking-[0.18em] ${subtitleClasses}`}
+          >
+            {subtitle}
+          </div>
+
+          <div className="flex items-center justify-end gap-2">{actionEnd}</div>
         </div>
       </div>
     </div>
@@ -1070,27 +1078,35 @@ export function Attacks({
 
                       <div className="space-y-2 text-sm leading-6 text-muted-foreground">
                         <div>
-                          <span className="text-gold/90">Ataque</span>{" "}
+                          <span className="text-[rgb(244,120,120)]/90">
+                            Ataque
+                          </span>{" "}
                           {weaponAttackSummary}
                         </div>
                         <div>
-                          <span className="text-gold/90">Base</span>{" "}
+                          <span className="text-[rgb(244,120,120)]/90">
+                            Base
+                          </span>{" "}
                           {getWeaponBaseExpression(attack)}
                         </div>
                         <div>
-                          <span className="text-gold/90">Total</span>{" "}
+                          <span className="text-[rgb(244,120,120)]/90">
+                            Total
+                          </span>{" "}
                           {getWeaponDamageExpression(attack)}
                         </div>
                         {hasWeaponModifierBreakdown ? (
                           <div>
-                            <span className="text-gold/90">
+                            <span className="text-[rgb(244,120,120)]/90">
                               Desglose de modificadores
                             </span>{" "}
                             {weaponModifierBreakdown}
                           </div>
                         ) : null}
                         <div>
-                          <span className="text-gold/90">Resumen</span>{" "}
+                          <span className="text-[rgb(244,120,120)]/90">
+                            Resumen
+                          </span>{" "}
                           {weaponDamageSummary}
                         </div>
                       </div>
@@ -1122,18 +1138,22 @@ export function Attacks({
 
                       <div className="space-y-2 text-sm leading-6 text-muted-foreground">
                         <div>
-                          <span className="text-accent/90">Base</span>{" "}
+                          <span className="text-[rgb(124,181,255)]/90">
+                            Base
+                          </span>{" "}
                           {getSpellBaseExpression(attack)}
                         </div>
 
                         <div>
-                          <span className="text-accent/90">Total</span>{" "}
+                          <span className="text-[rgb(124,181,255)]/90">
+                            Total
+                          </span>{" "}
                           {getSpellExpression(attack)}
                         </div>
 
                         {hasSpellModifierBreakdown ? (
                           <div>
-                            <span className="text-accent/90">
+                            <span className="text-[rgb(124,181,255)]/90">
                               Desglose de modificadores
                             </span>{" "}
                             {spellModifierBreakdown}
@@ -1157,183 +1177,174 @@ export function Attacks({
                     ? "Sin notas adicionales para esta secuencia de combate."
                     : "Sin notas adicionales para este conjuro o efecto.")
                 }
-                actions={
+                actionStart={
                   <>
-                    <div className="flex flex-wrap items-center gap-2">
-                      {attack.actionType === "weapon" ? (
-                        <>
-                          <div className="flex flex-col items-center gap-1">
+                    {attack.actionType === "weapon" ? (
+                      <>
+                        <div className="flex items-center">
+                          <DiceButton
+                            onClick={() =>
+                              onRollAttack(
+                                attack.id,
+                                `${attack.name} Ataque`,
+                                weaponAttackRollModifiers,
+                                weaponAttackCount,
+                                weaponSnapshot?.criticalRangeStart,
+                                selectedAttackRollMode,
+                                weaponAttackBonuses,
+                              )
+                            }
+                            size="md"
+                          />
+                        </div>
+
+                        <MacroActionButton
+                          onClick={() => {
+                            onRollDamage(
+                              `${attack.name} Dano`,
+                              getWeaponDamageConfig(
+                                attack,
+                                criticalAttackIndexes,
+                              ),
+                            );
+
+                            if (hasCriticalDamageState) {
+                              onResetWeaponCriticalState(attack.id);
+                            }
+                          }}
+                          title="Tirar dano"
+                          tone={hasCriticalDamageState ? "success" : "weapon"}
+                        >
+                          <svg
+                            viewBox="0 0 20 20"
+                            aria-hidden="true"
+                            className="h-4 w-4"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                          >
+                            <path
+                              d="M4 6.5h12M4 10h12M4 13.5h12"
+                              strokeLinecap="round"
+                            />
+                            <path
+                              d="M6 4.5h8v11H6z"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                        </MacroActionButton>
+
+                        {hasCriticalDamageState ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              onResetWeaponCriticalState(attack.id)
+                            }
+                            className="rounded-xl border border-critical/35 bg-critical/10 px-3 py-2 text-sm text-critical transition-colors hover:bg-critical/15"
+                          >
+                            Reset crit
+                          </button>
+                        ) : null}
+                      </>
+                    ) : (
+                      <>
+                        {attack.spellConfig?.requiresTouchAttack ? (
+                          <div className="flex items-center">
                             <DiceButton
                               onClick={() =>
                                 onRollAttack(
-                                  attack.id,
-                                  `${attack.name} Ataque`,
-                                  weaponAttackRollModifiers,
-                                  weaponAttackCount,
-                                  weaponSnapshot?.criticalRangeStart,
+                                  undefined,
+                                  `${attack.name} Toque`,
+                                  getSpellTouchAttackModifiers(attack),
+                                  1,
+                                  undefined,
                                   selectedAttackRollMode,
-                                  weaponAttackBonuses,
                                 )
                               }
                               size="md"
                             />
-                            <span className="text-xs text-muted-foreground">
-                              Atq
-                            </span>
                           </div>
+                        ) : null}
 
-                          <MacroActionButton
-                            onClick={() => {
-                              onRollDamage(
-                                `${attack.name} Dano`,
-                                getWeaponDamageConfig(
-                                  attack,
-                                  criticalAttackIndexes,
-                                ),
-                              );
-
-                              if (hasCriticalDamageState) {
-                                onResetWeaponCriticalState(attack.id);
-                              }
-                            }}
-                            title="Tirar dano"
-                            label="Dano"
-                            tone={hasCriticalDamageState ? "success" : "accent"}
-                          >
-                            <svg
-                              viewBox="0 0 20 20"
-                              aria-hidden="true"
-                              className="h-4 w-4"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="1.8"
-                            >
-                              <path
-                                d="M4 6.5h12M4 10h12M4 13.5h12"
-                                strokeLinecap="round"
-                              />
-                              <path
-                                d="M6 4.5h8v11H6z"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              />
-                            </svg>
-                          </MacroActionButton>
-
-                          {hasCriticalDamageState ? (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                onResetWeaponCriticalState(attack.id)
-                              }
-                              className="rounded-xl border border-critical/35 bg-critical/10 px-3 py-2 text-sm text-critical transition-colors hover:bg-critical/15"
-                            >
-                              Reset crit
-                            </button>
-                          ) : null}
-                        </>
-                      ) : (
-                        <>
-                          {attack.spellConfig?.requiresTouchAttack ? (
-                            <div className="flex flex-col items-center gap-1">
-                              <DiceButton
-                                onClick={() =>
-                                  onRollAttack(
-                                    undefined,
-                                    `${attack.name} Toque`,
-                                    getSpellTouchAttackModifiers(attack),
-                                    1,
-                                    undefined,
-                                    selectedAttackRollMode,
-                                  )
-                                }
-                                size="md"
-                              />
-                              <span className="text-xs text-muted-foreground">
-                                Toq
-                              </span>
-                            </div>
-                          ) : null}
-
-                          <MacroActionButton
-                            onClick={() =>
-                              onRollDamage(`${attack.name} Hechizo`, {
-                                ...getSpellDamageConfig(attack),
-                              })
-                            }
-                            title="Tirar hechizo"
-                            label="Hech"
-                          >
-                            <svg
-                              viewBox="0 0 20 20"
-                              aria-hidden="true"
-                              className="h-4 w-4"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="1.8"
-                            >
-                              <path
-                                d="M10 2.5v3M10 14.5v3M3.5 10h3M13.5 10h3M5.6 5.6l2.1 2.1M12.3 12.3l2.1 2.1M14.4 5.6l-2.1 2.1M7.7 12.3l-2.1 2.1"
-                                strokeLinecap="round"
-                              />
-                              <circle cx="10" cy="10" r="2.5" />
-                            </svg>
-                          </MacroActionButton>
-                        </>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <MacroIconButton
-                        onClick={() => setEditingActionId(attack.id)}
-                        title="Editar macro"
-                      >
-                        <svg
-                          viewBox="0 0 20 20"
-                          aria-hidden="true"
-                          className="h-4 w-4"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.7"
+                        <MacroActionButton
+                          onClick={() =>
+                            onRollDamage(`${attack.name} Hechizo`, {
+                              ...getSpellDamageConfig(attack),
+                            })
+                          }
+                          title="Tirar hechizo"
                         >
-                          <path
-                            d="M4.5 15.5 5.1 12.9 12.95 5.05a1.5 1.5 0 0 1 2.12 0l.88.88a1.5 1.5 0 0 1 0 2.12L8.1 15.9 5.5 16.5Z"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                          <path d="m11.8 6.2 2 2" strokeLinecap="round" />
-                        </svg>
-                      </MacroIconButton>
-
-                      <MacroIconButton
-                        onClick={() => removeAttack(attack.id)}
-                        title="Eliminar macro"
-                        tone="danger"
+                          <svg
+                            viewBox="0 0 20 20"
+                            aria-hidden="true"
+                            className="h-4 w-4"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                          >
+                            <path
+                              d="M10 2.5v3M10 14.5v3M3.5 10h3M13.5 10h3M5.6 5.6l2.1 2.1M12.3 12.3l2.1 2.1M14.4 5.6l-2.1 2.1M7.7 12.3l-2.1 2.1"
+                              strokeLinecap="round"
+                            />
+                            <circle cx="10" cy="10" r="2.5" />
+                          </svg>
+                        </MacroActionButton>
+                      </>
+                    )}
+                  </>
+                }
+                actionEnd={
+                  <>
+                    <MacroIconButton
+                      onClick={() => setEditingActionId(attack.id)}
+                      title="Editar macro"
+                    >
+                      <svg
+                        viewBox="0 0 20 20"
+                        aria-hidden="true"
+                        className="h-4 w-4"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.7"
                       >
-                        <svg
-                          viewBox="0 0 20 20"
-                          aria-hidden="true"
-                          className="h-4 w-4"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.7"
-                        >
-                          <path d="M4.5 6h11" strokeLinecap="round" />
-                          <path
-                            d="M8 6V4.75A1.25 1.25 0 0 1 9.25 3.5h1.5A1.25 1.25 0 0 1 12 4.75V6"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                          <path
-                            d="M6.25 6.75v7.5A1.75 1.75 0 0 0 8 16h4a1.75 1.75 0 0 0 1.75-1.75v-7.5"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                          <path d="M8.5 9.25v4" strokeLinecap="round" />
-                          <path d="M11.5 9.25v4" strokeLinecap="round" />
-                        </svg>
-                      </MacroIconButton>
-                    </div>
+                        <path
+                          d="M4.5 15.5 5.1 12.9 12.95 5.05a1.5 1.5 0 0 1 2.12 0l.88.88a1.5 1.5 0 0 1 0 2.12L8.1 15.9 5.5 16.5Z"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        <path d="m11.8 6.2 2 2" strokeLinecap="round" />
+                      </svg>
+                    </MacroIconButton>
+
+                    <MacroIconButton
+                      onClick={() => removeAttack(attack.id)}
+                      title="Eliminar macro"
+                      tone="danger"
+                    >
+                      <svg
+                        viewBox="0 0 20 20"
+                        aria-hidden="true"
+                        className="h-4 w-4"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.7"
+                      >
+                        <path d="M4.5 6h11" strokeLinecap="round" />
+                        <path
+                          d="M8 6V4.75A1.25 1.25 0 0 1 9.25 3.5h1.5A1.25 1.25 0 0 1 12 4.75V6"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        <path
+                          d="M6.25 6.75v7.5A1.75 1.75 0 0 0 8 16h4a1.75 1.75 0 0 0 1.75-1.75v-7.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        <path d="M8.5 9.25v4" strokeLinecap="round" />
+                        <path d="M11.5 9.25v4" strokeLinecap="round" />
+                      </svg>
+                    </MacroIconButton>
                   </>
                 }
               />
