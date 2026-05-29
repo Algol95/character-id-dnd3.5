@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { BattleActionModal } from "./battleActionModal";
 import { DiceButton } from "./diceButton";
 import { FormCheckbox } from "./formCheckbox";
@@ -92,6 +92,340 @@ function MacroActionButton({
   );
 }
 
+function MacroInfoChip({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: "weapon" | "spell" | "neutral";
+}) {
+  const toneClasses =
+    tone === "weapon"
+      ? "border-gold/20 bg-gold/6 text-foreground"
+      : tone === "spell"
+        ? "border-accent/22 bg-accent/8 text-foreground"
+        : "border-border/50 bg-background/20 text-foreground";
+
+  return (
+    <div
+      className={`rounded-2xl border px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] ${toneClasses}`}
+    >
+      <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+        {label}
+      </div>
+      <div className="mt-1 text-sm font-semibold leading-tight text-foreground">
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function MacroIconButton({
+  onClick,
+  title,
+  tone = "neutral",
+  children,
+}: {
+  onClick: () => void;
+  title: string;
+  tone?: "neutral" | "danger";
+  children: ReactNode;
+}) {
+  const toneClasses =
+    tone === "danger"
+      ? "border-blood-red/35 bg-blood-red/10 text-blood-red hover:bg-blood-red/15"
+      : "border-border/60 bg-background/25 text-muted-foreground hover:border-gold/30 hover:text-foreground";
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      aria-label={title}
+      className={`flex h-10 w-10 items-center justify-center rounded-xl border transition-colors ${toneClasses}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function MacroCollapseButton({
+  collapsed,
+  onClick,
+  tone,
+}: {
+  collapsed: boolean;
+  onClick: () => void;
+  tone: "weapon" | "spell";
+}) {
+  const toneClasses =
+    tone === "weapon"
+      ? "border-gold/25 bg-gold/8 text-gold hover:bg-gold/12"
+      : "border-accent/28 bg-accent/10 text-accent hover:bg-accent/14";
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={collapsed ? "Desplegar macro" : "Replegar macro"}
+      aria-label={collapsed ? "Desplegar macro" : "Replegar macro"}
+      className={`flex h-10 w-10 items-center justify-center rounded-xl border transition-colors ${toneClasses}`}
+    >
+      <svg
+        viewBox="0 0 20 20"
+        aria-hidden="true"
+        className={`h-4 w-4 transition-transform duration-200 ${collapsed ? "rotate-180" : ""}`}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      >
+        <path
+          d="M5 7.5 10 12.5 15 7.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </button>
+  );
+}
+
+function MacroBodyPanel({
+  children,
+  tone,
+}: {
+  children: ReactNode;
+  tone: "weapon" | "spell";
+}) {
+  const toneClasses =
+    tone === "weapon"
+      ? "border-gold/18 bg-black/10"
+      : "border-accent/18 bg-black/10";
+
+  return (
+    <div className={`space-y-3 rounded-[22px] border p-4 ${toneClasses}`}>
+      {children}
+    </div>
+  );
+}
+
+function MacroCard({
+  title,
+  subtitle,
+  icon,
+  tone,
+  headerChips,
+  details,
+  notes,
+  actions,
+  collapsed,
+  onToggle,
+}: {
+  title: string;
+  subtitle: string;
+  icon: ReactNode;
+  tone: "weapon" | "spell";
+  headerChips: ReactNode;
+  details: ReactNode;
+  notes: ReactNode;
+  actions: ReactNode;
+  collapsed: boolean;
+  onToggle: () => void;
+}) {
+  const cardToneClasses =
+    tone === "weapon"
+      ? "border-gold/22 bg-[linear-gradient(180deg,rgba(37,30,22,0.96)_0%,rgba(23,18,14,0.98)_100%)] shadow-[0_10px_26px_rgba(212,175,55,0.06)]"
+      : "border-accent/24 bg-[linear-gradient(180deg,rgba(40,24,24,0.96)_0%,rgba(23,18,18,0.98)_100%)] shadow-[0_10px_26px_rgba(190,92,52,0.08)]";
+  const iconShellClasses =
+    tone === "weapon"
+      ? "border-gold/30 bg-gold/10 text-gold"
+      : "border-accent/32 bg-accent/10 text-accent";
+  const actionPanelClasses =
+    tone === "weapon"
+      ? "border-gold/14 bg-background/12"
+      : "border-accent/16 bg-background/12";
+  const notePanelClasses =
+    tone === "weapon"
+      ? "border-gold/12 bg-black/8"
+      : "border-accent/14 bg-black/8";
+  const detailsPanelRef = useRef<HTMLDivElement | null>(null);
+  const [detailsPanelHeight, setDetailsPanelHeight] = useState<number | null>(
+    null,
+  );
+  const [shouldSyncNotesHeight, setShouldSyncNotesHeight] = useState(() =>
+    typeof window !== "undefined" ? window.innerWidth >= 1024 : false,
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const mediaQuery = window.matchMedia("(min-width: 1024px)");
+    const updateViewportMode = () => {
+      setShouldSyncNotesHeight(mediaQuery.matches);
+    };
+
+    updateViewportMode();
+    mediaQuery.addEventListener("change", updateViewportMode);
+
+    return () => {
+      mediaQuery.removeEventListener("change", updateViewportMode);
+    };
+  }, []);
+
+  useEffect(() => {
+    const detailsElement = detailsPanelRef.current;
+
+    if (!detailsElement || typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    const updateHeight = () => {
+      setDetailsPanelHeight(detailsElement.getBoundingClientRect().height);
+    };
+
+    updateHeight();
+
+    const resizeObserver = new ResizeObserver(() => {
+      updateHeight();
+    });
+
+    resizeObserver.observe(detailsElement);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [collapsed, details, shouldSyncNotesHeight]);
+
+  const notePanelStyle =
+    shouldSyncNotesHeight && detailsPanelHeight
+      ? { height: `${detailsPanelHeight}px` }
+      : undefined;
+
+  return (
+    <div
+      className={`rounded-3xl border p-4 transition-shadow duration-200 hover:shadow-[0_18px_42px_rgba(0,0,0,0.22)] ${cardToneClasses}`}
+    >
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div className="flex min-w-0 items-start gap-3">
+            <div
+              className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border ${iconShellClasses}`}
+            >
+              {icon}
+            </div>
+
+            <div className="min-w-0">
+              <h4 className="text-lg font-semibold text-foreground">{title}</h4>
+              <div className="mt-1 text-xs uppercase tracking-[0.16em] text-muted-foreground/85">
+                {subtitle}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-2">
+            <div className="grid gap-2 sm:grid-cols-2 xl:min-w-[320px]">
+              {headerChips}
+            </div>
+            <MacroCollapseButton
+              collapsed={collapsed}
+              onClick={onToggle}
+              tone={tone}
+            />
+          </div>
+        </div>
+
+        <div
+          aria-hidden={collapsed}
+          className={`grid transition-[grid-template-rows,opacity] duration-300 ease-out ${collapsed ? "grid-rows-[0fr] opacity-0" : "grid-rows-[1fr] opacity-100"}`}
+        >
+          <div className="min-h-0 overflow-hidden">
+            <div
+              className={`flex flex-col gap-4 pt-1 transition-transform duration-300 ease-out ${collapsed ? "-translate-y-2" : "translate-y-0"}`}
+            >
+              <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+                <div ref={detailsPanelRef} className="min-h-0">
+                  {details}
+                </div>
+
+                <div
+                  className={`relative rounded-[22px] border text-sm leading-6 text-muted-foreground lg:flex lg:min-h-0 lg:flex-col lg:overflow-hidden ${notePanelClasses}`}
+                  style={notePanelStyle}
+                >
+                  <div className="pointer-events-none absolute inset-x-4 top-4 z-10 text-[10px] uppercase tracking-[0.16em] text-muted-foreground/80">
+                    Notas y contexto
+                  </div>
+                  <div className="max-h-40 min-h-12 overflow-y-auto px-4 pb-4 pt-10 pr-2 whitespace-pre-wrap lg:min-h-0 lg:flex-1 lg:max-h-none">
+                    {notes}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div
+          className={`flex flex-wrap items-center justify-between gap-3 rounded-[18px] border px-3 py-2 ${actionPanelClasses}`}
+        >
+          {actions}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WeaponMacroIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className="h-5 w-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+    >
+      <path
+        d="M14.5 4.5 19.5 9.5 9.75 19.25 5 20l.75-4.75L14.5 4.5Z"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d="m13 6 5 5" strokeLinecap="round" />
+      <path d="M4.5 19.5 8 16" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function SpellMacroIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className="h-5 w-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+    >
+      <path
+        d="M12 3.5 13.65 8.35 18.5 10 13.65 11.65 12 16.5 10.35 11.65 5.5 10 10.35 8.35 12 3.5Z"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M18 4.5 18.6 6.4 20.5 7 18.6 7.6 18 9.5 17.4 7.6 15.5 7 17.4 6.4 18 4.5Z"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M6 14.5 6.6 16.4 8.5 17 6.6 17.6 6 19.5 5.4 17.6 3.5 17 5.4 16.4 6 14.5Z"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 /**
  * Permite administrar la lista de ataques del personaje y lanzar sus tiradas.
  */
@@ -111,6 +445,9 @@ export function Attacks({
   const [attackRollModes, setAttackRollModes] = useState<
     Record<string, DiceRollMode>
   >({});
+  const [collapsedCards, setCollapsedCards] = useState<Record<string, boolean>>(
+    {},
+  );
 
   const actionBeingEdited = useMemo(
     () =>
@@ -251,6 +588,19 @@ export function Attacks({
     damageGroups
       .map((group) => `${group.diceCount}d${group.diceType}`)
       .join(" + ");
+
+  const getSpellBaseExpression = (attack: Attack) =>
+    formatDamageGroupsExpression(getSpellDamageGroups(attack.spellConfig));
+
+  const getWeaponBaseExpression = (attack: Attack) => {
+    const snapshot = resolveWeaponSnapshot(attack);
+
+    if (!snapshot) {
+      return "1d6";
+    }
+
+    return `${getEffectiveWeaponDiceCount(attack)}d${snapshot.damageDiceType}`;
+  };
 
   const summarizeModifiers = (
     modifiers: BattleActionModifier[],
@@ -504,6 +854,23 @@ export function Attacks({
       delete nextModes[attackId];
       return nextModes;
     });
+
+    setCollapsedCards((currentCards) => {
+      if (!(attackId in currentCards)) {
+        return currentCards;
+      }
+
+      const nextCards = { ...currentCards };
+      delete nextCards[attackId];
+      return nextCards;
+    });
+  };
+
+  const toggleAttackCard = (attackId: string) => {
+    setCollapsedCards((currentCards) => ({
+      ...currentCards,
+      [attackId]: !currentCards[attackId],
+    }));
   };
 
   const handleAttackRollModeToggle = (
@@ -550,7 +917,7 @@ export function Attacks({
       isOpen={isOpen}
       onToggle={onToggle}
     >
-      <div className="space-y-3">
+      <div className="max-h-[75vh] space-y-4 overflow-y-auto pr-2">
         {character.attacks.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-border/60 bg-secondary/12 px-4 py-5 text-sm leading-6 text-muted-foreground">
             Crea macros para ataques con arma, acciones melee o hechizos y
@@ -558,10 +925,10 @@ export function Attacks({
           </div>
         ) : (
           character.attacks.map((attack) => {
-            const weaponSnapshot =
-              attack.actionType === "weapon"
-                ? resolveWeaponSnapshot(attack)
-                : null;
+            const isWeaponMacro = attack.actionType === "weapon";
+            const weaponSnapshot = isWeaponMacro
+              ? resolveWeaponSnapshot(attack)
+              : null;
             const weaponAttackRollModifiers = [
               {
                 label: "Bono base de ataque",
@@ -587,237 +954,389 @@ export function Attacks({
               getEffectiveWeaponDiceCount(attack);
             const selectedAttackRollMode =
               attackRollModes[attack.id] ?? "normal";
+            const isCollapsed = collapsedCards[attack.id] ?? false;
             const criticalRange = weaponSnapshot
               ? weaponSnapshot.criticalRangeStart >= 20
                 ? "20"
                 : `${weaponSnapshot.criticalRangeStart}-20`
               : null;
+            const weaponAttackSummary = weaponAttackBonuses.every(
+              (bonus) => bonus === weaponAttackBonuses[0],
+            )
+              ? `${formatModifier(weaponAttackBonuses[0] ?? 0)}${weaponAttackCount > 1 ? ` x${weaponAttackCount}` : ""}`
+              : weaponAttackBonuses
+                  .map((bonus) => formatModifier(bonus))
+                  .join(" / ");
+            const weaponDamageSummary = `${getWeaponDamageExpression(attack)}${
+              damageBonusSummary.total !== 0 || damageBonusSummary.perDie !== 0
+                ? ` (${formatModifierSummary(
+                    damageBonusSummary.total,
+                    damageBonusSummary.perDie,
+                    effectiveWeaponDiceCount,
+                  )})`
+                : ""
+            }`;
+            const hasWeaponModifierBreakdown =
+              damageBonusSummary.total !== 0 || damageBonusSummary.perDie !== 0;
+            const weaponModifierBreakdown = hasWeaponModifierBreakdown
+              ? formatModifierSummary(
+                  damageBonusSummary.total,
+                  damageBonusSummary.perDie,
+                  effectiveWeaponDiceCount,
+                )
+              : "";
+            const hasSpellModifierBreakdown =
+              spellBonusSummary.total !== 0 ||
+              spellBonusSummary.perDie !== 0 ||
+              Object.values(spellBonusSummary.perGroup).some(
+                (value) => value !== 0,
+              );
+            const spellModifierBreakdown = hasSpellModifierBreakdown
+              ? formatSpellModifierSummary(
+                  spellBonusSummary.total,
+                  spellBonusSummary.perDie,
+                  spellBonusSummary.perGroup,
+                  spellDamageGroups,
+                )
+              : "";
 
             return (
-              <div
+              <MacroCard
                 key={attack.id}
-                className="rounded-2xl border border-border/60 bg-secondary/20 p-4"
-              >
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h4 className="text-base font-semibold text-foreground">
-                        {attack.name}
-                      </h4>
-                      <span className="rounded-full border border-gold/30 bg-gold/10 px-2.5 py-1 text-[11px] uppercase tracking-[0.12em] text-gold">
-                        {attack.actionType === "weapon"
-                          ? "Arma / melee"
-                          : "Hechizo"}
-                      </span>
-                    </div>
+                title={attack.name}
+                subtitle={
+                  isWeaponMacro
+                    ? "Macro de combate fisico"
+                    : "Macro de conjuro o efecto"
+                }
+                icon={isWeaponMacro ? <WeaponMacroIcon /> : <SpellMacroIcon />}
+                tone={isWeaponMacro ? "weapon" : "spell"}
+                collapsed={isCollapsed}
+                onToggle={() => toggleAttackCard(attack.id)}
+                headerChips={
+                  isWeaponMacro && weaponSnapshot ? (
+                    <>
+                      <MacroInfoChip
+                        label="Perfil"
+                        value={`${effectiveWeaponDiceCount}d${weaponSnapshot.damageDiceType}`}
+                        tone="weapon"
+                      />
+                      <MacroInfoChip
+                        label="Critico"
+                        value={`${criticalRange}/x${weaponSnapshot.criticalMultiplier}`}
+                        tone="weapon"
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <MacroInfoChip
+                        label="Lanzamiento"
+                        value={getSpellExpression(attack)}
+                        tone="spell"
+                      />
+                      <MacroInfoChip
+                        label="Toque"
+                        value={
+                          attack.spellConfig?.requiresTouchAttack
+                            ? getSpellTouchAttackSummary(attack)
+                            : "Sin toque"
+                        }
+                        tone="spell"
+                      />
+                    </>
+                  )
+                }
+                details={
+                  attack.actionType === "weapon" && weaponSnapshot ? (
+                    <MacroBodyPanel tone="weapon">
+                      <div className="flex flex-wrap gap-2">
+                        <MacroInfoChip
+                          label="Arma"
+                          value={weaponSnapshot.name}
+                          tone="weapon"
+                        />
+                        <MacroInfoChip
+                          label="Tipo"
+                          value={
+                            attack.weaponConfig?.damageType
+                              ? DAMAGE_TYPE_LABELS[
+                                  attack.weaponConfig.damageType
+                                ]
+                              : "Sin tipo"
+                          }
+                          tone="neutral"
+                        />
+                      </div>
 
-                    <div className="mt-2 space-y-1 text-sm text-muted-foreground">
-                      {attack.actionType === "weapon" && weaponSnapshot ? (
-                        <>
+                      <div className="space-y-2 text-sm leading-6 text-muted-foreground">
+                        <div>
+                          <span className="text-gold/90">Ataque</span>{" "}
+                          {weaponAttackSummary}
+                        </div>
+                        <div>
+                          <span className="text-gold/90">Base</span>{" "}
+                          {getWeaponBaseExpression(attack)}
+                        </div>
+                        <div>
+                          <span className="text-gold/90">Total</span>{" "}
+                          {getWeaponDamageExpression(attack)}
+                        </div>
+                        {hasWeaponModifierBreakdown ? (
                           <div>
-                            {weaponSnapshot.name} · {effectiveWeaponDiceCount}d
-                            {weaponSnapshot.damageDiceType}
-                            {attack.weaponConfig?.damageType
-                              ? ` · ${DAMAGE_TYPE_LABELS[attack.weaponConfig.damageType]}`
-                              : ""}{" "}
-                            · Critico {criticalRange}/x
-                            {weaponSnapshot.criticalMultiplier}
+                            <span className="text-gold/90">
+                              Desglose de modificadores
+                            </span>{" "}
+                            {weaponModifierBreakdown}
                           </div>
-                          <div>
-                            Ataque{" "}
-                            {weaponAttackBonuses.every(
-                              (bonus) => bonus === weaponAttackBonuses[0],
+                        ) : null}
+                        <div>
+                          <span className="text-gold/90">Resumen</span>{" "}
+                          {weaponDamageSummary}
+                        </div>
+                      </div>
+
+                      {renderAttackRollModeControls(attack)}
+                    </MacroBodyPanel>
+                  ) : (
+                    <MacroBodyPanel tone="spell">
+                      <div className="flex flex-wrap gap-2">
+                        <MacroInfoChip
+                          label="Dados"
+                          value={spellDamageGroups
+                            .map(
+                              (group) => `${group.diceCount}d${group.diceType}`,
                             )
-                              ? `${formatModifier(weaponAttackBonuses[0] ?? 0)}${weaponAttackCount > 1 ? ` x${weaponAttackCount}` : ""}`
-                              : weaponAttackBonuses
-                                  .map((bonus) => formatModifier(bonus))
-                                  .join(" / ")}{" "}
-                            · Dano {getWeaponDamageExpression(attack)}
-                            {damageBonusSummary.total !== 0 ||
-                            damageBonusSummary.perDie !== 0
-                              ? ` (${formatModifierSummary(
-                                  damageBonusSummary.total,
-                                  damageBonusSummary.perDie,
-                                  effectiveWeaponDiceCount,
-                                )})`
-                              : ""}
-                          </div>
-                          {renderAttackRollModeControls(attack)}
-                        </>
-                      ) : null}
+                            .join(" + ")}
+                          tone="spell"
+                        />
+                        <MacroInfoChip
+                          label="Aplicacion"
+                          value={
+                            attack.spellConfig?.requiresTouchAttack
+                              ? "Con tirada de toque"
+                              : "Resolucion directa"
+                          }
+                          tone="neutral"
+                        />
+                      </div>
 
-                      {attack.actionType === "spell" ? (
-                        <>
-                          <div>
-                            Tirada {getSpellExpression(attack)}
-                            {spellBonusSummary.total !== 0 ||
-                            spellBonusSummary.perDie !== 0 ||
-                            Object.values(spellBonusSummary.perGroup).some(
-                              (value) => value !== 0,
-                            )
-                              ? ` · Ajustes ${formatSpellModifierSummary(
-                                  spellBonusSummary.total,
-                                  spellBonusSummary.perDie,
-                                  spellBonusSummary.perGroup,
-                                  spellDamageGroups,
-                                )}`
-                              : ""}
-                          </div>
-
-                          {attack.spellConfig?.requiresTouchAttack ? (
-                            <>
-                              <div>{getSpellTouchAttackSummary(attack)}</div>
-                              {renderAttackRollModeControls(attack)}
-                            </>
-                          ) : null}
-                        </>
-                      ) : null}
-
-                      {attack.notes ? <div>{attack.notes}</div> : null}
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2">
-                    {attack.actionType === "weapon" ? (
-                      <>
-                        <div className="flex flex-col items-center gap-1">
-                          <DiceButton
-                            onClick={() =>
-                              onRollAttack(
-                                attack.id,
-                                `${attack.name} Ataque`,
-                                weaponAttackRollModifiers,
-                                weaponAttackCount,
-                                weaponSnapshot?.criticalRangeStart,
-                                selectedAttackRollMode,
-                                weaponAttackBonuses,
-                              )
-                            }
-                            size="md"
-                          />
-                          <span className="text-xs text-muted-foreground">
-                            Atq
-                          </span>
+                      <div className="space-y-2 text-sm leading-6 text-muted-foreground">
+                        <div>
+                          <span className="text-accent/90">Base</span>{" "}
+                          {getSpellBaseExpression(attack)}
                         </div>
 
-                        <MacroActionButton
-                          onClick={() => {
-                            onRollDamage(
-                              `${attack.name} Dano`,
-                              getWeaponDamageConfig(
-                                attack,
-                                criticalAttackIndexes,
-                              ),
-                            );
+                        <div>
+                          <span className="text-accent/90">Total</span>{" "}
+                          {getSpellExpression(attack)}
+                        </div>
 
-                            if (hasCriticalDamageState) {
-                              onResetWeaponCriticalState(attack.id);
-                            }
-                          }}
-                          title="Tirar dano"
-                          label="Dano"
-                          tone={hasCriticalDamageState ? "success" : "accent"}
-                        >
-                          <svg
-                            viewBox="0 0 20 20"
-                            aria-hidden="true"
-                            className="h-4 w-4"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="1.8"
-                          >
-                            <path
-                              d="M4 6.5h12M4 10h12M4 13.5h12"
-                              strokeLinecap="round"
-                            />
-                            <path
-                              d="M6 4.5h8v11H6z"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
-                          </svg>
-                        </MacroActionButton>
-
-                        {hasCriticalDamageState ? (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              onResetWeaponCriticalState(attack.id)
-                            }
-                            className="rounded-xl border border-critical/35 bg-critical/10 px-3 py-2 text-sm text-critical transition-colors hover:bg-critical/15"
-                          >
-                            Reset crit
-                          </button>
+                        {hasSpellModifierBreakdown ? (
+                          <div>
+                            <span className="text-accent/90">
+                              Desglose de modificadores
+                            </span>{" "}
+                            {spellModifierBreakdown}
+                          </div>
                         ) : null}
-                      </>
-                    ) : (
-                      <>
+
                         {attack.spellConfig?.requiresTouchAttack ? (
+                          <div>{getSpellTouchAttackSummary(attack)}</div>
+                        ) : null}
+                      </div>
+
+                      {attack.spellConfig?.requiresTouchAttack
+                        ? renderAttackRollModeControls(attack)
+                        : null}
+                    </MacroBodyPanel>
+                  )
+                }
+                notes={
+                  attack.notes ||
+                  (isWeaponMacro
+                    ? "Sin notas adicionales para esta secuencia de combate."
+                    : "Sin notas adicionales para este conjuro o efecto.")
+                }
+                actions={
+                  <>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {attack.actionType === "weapon" ? (
+                        <>
                           <div className="flex flex-col items-center gap-1">
                             <DiceButton
                               onClick={() =>
                                 onRollAttack(
-                                  undefined,
-                                  `${attack.name} Toque`,
-                                  getSpellTouchAttackModifiers(attack),
-                                  1,
-                                  undefined,
+                                  attack.id,
+                                  `${attack.name} Ataque`,
+                                  weaponAttackRollModifiers,
+                                  weaponAttackCount,
+                                  weaponSnapshot?.criticalRangeStart,
                                   selectedAttackRollMode,
+                                  weaponAttackBonuses,
                                 )
                               }
                               size="md"
                             />
                             <span className="text-xs text-muted-foreground">
-                              Toq
+                              Atq
                             </span>
                           </div>
-                        ) : null}
 
-                        <MacroActionButton
-                          onClick={() =>
-                            onRollDamage(`${attack.name} Hechizo`, {
-                              ...getSpellDamageConfig(attack),
-                            })
-                          }
-                          title="Tirar hechizo"
-                          label="Hech"
-                        >
-                          <svg
-                            viewBox="0 0 20 20"
-                            aria-hidden="true"
-                            className="h-4 w-4"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="1.8"
+                          <MacroActionButton
+                            onClick={() => {
+                              onRollDamage(
+                                `${attack.name} Dano`,
+                                getWeaponDamageConfig(
+                                  attack,
+                                  criticalAttackIndexes,
+                                ),
+                              );
+
+                              if (hasCriticalDamageState) {
+                                onResetWeaponCriticalState(attack.id);
+                              }
+                            }}
+                            title="Tirar dano"
+                            label="Dano"
+                            tone={hasCriticalDamageState ? "success" : "accent"}
                           >
-                            <path
-                              d="M10 2.5v3M10 14.5v3M3.5 10h3M13.5 10h3M5.6 5.6l2.1 2.1M12.3 12.3l2.1 2.1M14.4 5.6l-2.1 2.1M7.7 12.3l-2.1 2.1"
-                              strokeLinecap="round"
-                            />
-                            <circle cx="10" cy="10" r="2.5" />
-                          </svg>
-                        </MacroActionButton>
-                      </>
-                    )}
+                            <svg
+                              viewBox="0 0 20 20"
+                              aria-hidden="true"
+                              className="h-4 w-4"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.8"
+                            >
+                              <path
+                                d="M4 6.5h12M4 10h12M4 13.5h12"
+                                strokeLinecap="round"
+                              />
+                              <path
+                                d="M6 4.5h8v11H6z"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            </svg>
+                          </MacroActionButton>
 
-                    <button
-                      type="button"
-                      onClick={() => setEditingActionId(attack.id)}
-                      className="rounded-xl border border-border/60 bg-background/25 px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
-                    >
-                      Editar
-                    </button>
+                          {hasCriticalDamageState ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                onResetWeaponCriticalState(attack.id)
+                              }
+                              className="rounded-xl border border-critical/35 bg-critical/10 px-3 py-2 text-sm text-critical transition-colors hover:bg-critical/15"
+                            >
+                              Reset crit
+                            </button>
+                          ) : null}
+                        </>
+                      ) : (
+                        <>
+                          {attack.spellConfig?.requiresTouchAttack ? (
+                            <div className="flex flex-col items-center gap-1">
+                              <DiceButton
+                                onClick={() =>
+                                  onRollAttack(
+                                    undefined,
+                                    `${attack.name} Toque`,
+                                    getSpellTouchAttackModifiers(attack),
+                                    1,
+                                    undefined,
+                                    selectedAttackRollMode,
+                                  )
+                                }
+                                size="md"
+                              />
+                              <span className="text-xs text-muted-foreground">
+                                Toq
+                              </span>
+                            </div>
+                          ) : null}
 
-                    <button
-                      type="button"
-                      onClick={() => removeAttack(attack.id)}
-                      className="rounded-xl border border-blood-red/35 bg-blood-red/10 px-3 py-2 text-sm text-blood-red transition-colors hover:bg-blood-red/15"
-                    >
-                      Eliminar
-                    </button>
-                  </div>
-                </div>
-              </div>
+                          <MacroActionButton
+                            onClick={() =>
+                              onRollDamage(`${attack.name} Hechizo`, {
+                                ...getSpellDamageConfig(attack),
+                              })
+                            }
+                            title="Tirar hechizo"
+                            label="Hech"
+                          >
+                            <svg
+                              viewBox="0 0 20 20"
+                              aria-hidden="true"
+                              className="h-4 w-4"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.8"
+                            >
+                              <path
+                                d="M10 2.5v3M10 14.5v3M3.5 10h3M13.5 10h3M5.6 5.6l2.1 2.1M12.3 12.3l2.1 2.1M14.4 5.6l-2.1 2.1M7.7 12.3l-2.1 2.1"
+                                strokeLinecap="round"
+                              />
+                              <circle cx="10" cy="10" r="2.5" />
+                            </svg>
+                          </MacroActionButton>
+                        </>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <MacroIconButton
+                        onClick={() => setEditingActionId(attack.id)}
+                        title="Editar macro"
+                      >
+                        <svg
+                          viewBox="0 0 20 20"
+                          aria-hidden="true"
+                          className="h-4 w-4"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.7"
+                        >
+                          <path
+                            d="M4.5 15.5 5.1 12.9 12.95 5.05a1.5 1.5 0 0 1 2.12 0l.88.88a1.5 1.5 0 0 1 0 2.12L8.1 15.9 5.5 16.5Z"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                          <path d="m11.8 6.2 2 2" strokeLinecap="round" />
+                        </svg>
+                      </MacroIconButton>
+
+                      <MacroIconButton
+                        onClick={() => removeAttack(attack.id)}
+                        title="Eliminar macro"
+                        tone="danger"
+                      >
+                        <svg
+                          viewBox="0 0 20 20"
+                          aria-hidden="true"
+                          className="h-4 w-4"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.7"
+                        >
+                          <path d="M4.5 6h11" strokeLinecap="round" />
+                          <path
+                            d="M8 6V4.75A1.25 1.25 0 0 1 9.25 3.5h1.5A1.25 1.25 0 0 1 12 4.75V6"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                          <path
+                            d="M6.25 6.75v7.5A1.75 1.75 0 0 0 8 16h4a1.75 1.75 0 0 0 1.75-1.75v-7.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                          <path d="M8.5 9.25v4" strokeLinecap="round" />
+                          <path d="M11.5 9.25v4" strokeLinecap="round" />
+                        </svg>
+                      </MacroIconButton>
+                    </div>
+                  </>
+                }
+              />
             );
           })
         )}
