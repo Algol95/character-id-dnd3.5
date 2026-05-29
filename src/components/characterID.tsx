@@ -22,6 +22,7 @@ import { Footer } from "./footer";
 import {
   DEFAULT_CHARACTER,
   formatModifier,
+  getSpellDamageGroups,
   type Attack,
   type CharacterData,
   type EquippedItem,
@@ -228,23 +229,52 @@ function normalizeStoredAttack(
         : "";
     const normalizedSpellConfig = storedAttack.spellConfig
       ? "rollExpression" in storedAttack.spellConfig
-        ? {
-            damageDiceCount:
-              parseDamageRoll(legacySpellExpression)?.numDice ?? 1,
-            damageDiceType:
-              parseDamageRoll(legacySpellExpression)?.diceType ?? 6,
-            damageType: storedAttack.spellConfig.damageType,
-            effectModifiers: storedAttack.spellConfig.effectModifiers ?? [],
-          }
-        : {
-            damageDiceCount: Math.max(
-              1,
-              storedAttack.spellConfig.damageDiceCount ?? 1,
-            ),
-            damageDiceType: storedAttack.spellConfig.damageDiceType ?? 6,
-            damageType: storedAttack.spellConfig.damageType,
-            effectModifiers: storedAttack.spellConfig.effectModifiers ?? [],
-          }
+        ? (() => {
+            const parsedLegacySpellDamage = parseDamageRoll(
+              legacySpellExpression,
+            );
+            const normalizedDamageDiceGroups = [
+              {
+                id: createBattleActionId("spell-dice"),
+                diceCount: parsedLegacySpellDamage?.numDice ?? 1,
+                diceType: parsedLegacySpellDamage?.diceType ?? 6,
+                damageType: storedAttack.spellConfig.damageType,
+              },
+            ];
+
+            return {
+              damageDiceCount: normalizedDamageDiceGroups[0].diceCount,
+              damageDiceType: normalizedDamageDiceGroups[0].diceType,
+              damageDiceGroups: normalizedDamageDiceGroups,
+              damageType: normalizedDamageDiceGroups[0].damageType,
+              requiresTouchAttack: false,
+              touchAttackType: "melee" as const,
+              effectModifiers: storedAttack.spellConfig.effectModifiers ?? [],
+            };
+          })()
+        : (() => {
+            const normalizedDamageDiceGroups = getSpellDamageGroups(
+              storedAttack.spellConfig,
+            ).map((group) => ({
+              ...group,
+              id: group.id || createBattleActionId("spell-dice"),
+            }));
+
+            return {
+              damageDiceCount: normalizedDamageDiceGroups[0]?.diceCount ?? 1,
+              damageDiceType: normalizedDamageDiceGroups[0]?.diceType ?? 6,
+              damageDiceGroups: normalizedDamageDiceGroups,
+              damageType: normalizedDamageDiceGroups[0]?.damageType,
+              requiresTouchAttack: Boolean(
+                storedAttack.spellConfig.requiresTouchAttack,
+              ),
+              touchAttackType:
+                storedAttack.spellConfig.touchAttackType === "ranged"
+                  ? ("ranged" as const)
+                  : ("melee" as const),
+              effectModifiers: storedAttack.spellConfig.effectModifiers ?? [],
+            };
+          })()
       : undefined;
 
     return {
@@ -626,7 +656,13 @@ export function CharacterId() {
         totalBonus: number;
         perDieBonus: number;
         baseMultiplier?: number;
-        damageGroups?: { diceCount: number; baseMultiplier?: number }[];
+        damageGroups?: {
+          diceCount: number;
+          diceType?: number;
+          damageType?: string;
+          perDieBonus?: number;
+          baseMultiplier?: number;
+        }[];
       },
     ) => {
       const {
@@ -642,11 +678,17 @@ export function CharacterId() {
         damageGroups && damageGroups.length > 0
           ? damageGroups.map((group) => ({
               diceCount: Math.max(1, group.diceCount),
+              diceType: group.diceType ?? diceType,
+              damageType: group.damageType,
+              perDieBonus: group.perDieBonus ?? 0,
               baseMultiplier: Math.max(1, group.baseMultiplier ?? 1),
             }))
           : [
               {
                 diceCount: Math.max(1, diceCount),
+                diceType,
+                damageType: undefined,
+                perDieBonus: 0,
                 baseMultiplier: Math.max(1, baseMultiplier),
               },
             ];
@@ -654,7 +696,7 @@ export function CharacterId() {
       const groupedBaseRolls = resolvedDamageGroups.map((group) =>
         Array.from(
           { length: group.diceCount },
-          () => Math.floor(Math.random() * diceType) + 1,
+          () => Math.floor(Math.random() * group.diceType) + 1,
         ),
       );
       const baseRolls = groupedBaseRolls.flat();
@@ -683,14 +725,22 @@ export function CharacterId() {
       );
       const chipMetadata = groupedBaseRolls.flatMap(
         (groupRolls, groupIndex) => {
+          const groupPerDieBonus =
+            resolvedDamageGroups[groupIndex]?.perDieBonus ?? 0;
           const groupMultiplier = Math.max(
             1,
             resolvedDamageGroups[groupIndex]?.baseMultiplier ?? 1,
           );
           const isCriticalGroup = groupMultiplier > 1;
+          const chipLabel = `d${resolvedDamageGroups[groupIndex]?.diceType ?? diceType}`;
 
           return groupRolls.map((roll) => ({
-            value: roll * groupMultiplier + perDieBonus + totalBonus,
+            value:
+              roll * groupMultiplier +
+              perDieBonus +
+              groupPerDieBonus +
+              totalBonus,
+            label: chipLabel,
             tone: isCriticalGroup
               ? ("critical" as const)
               : ("default" as const),
@@ -698,8 +748,19 @@ export function CharacterId() {
         },
       );
       const perDieExtra = perDieBonus * baseDiceCount;
-      const expression = `${baseDiceCount}d${diceType}`;
+      const groupPerDieModifiers = resolvedDamageGroups
+        .map((group, groupIndex) => ({
+          value: (group.perDieBonus ?? 0) * group.diceCount,
+          label: `${formatModifier(group.perDieBonus ?? 0)} por dado en grupo ${groupIndex + 1} (${group.diceCount}d${group.diceType})`,
+        }))
+        .filter((modifier) => modifier.value !== 0);
+      const expression = resolvedDamageGroups
+        .map((group) => `${group.diceCount}d${group.diceType}`)
+        .join(" + ");
       const hasCriticalGroups = criticalGroups.length > 0;
+      const hasUniformDiceType = resolvedDamageGroups.every(
+        (group) => group.diceType === resolvedDamageGroups[0]?.diceType,
+      );
       const isUniformCritical =
         hasCriticalGroups &&
         criticalGroups.length === resolvedDamageGroups.length &&
@@ -718,7 +779,9 @@ export function CharacterId() {
         ...(remainingBaseRolls !== 0
           ? [
               {
-                label: `${baseDiceCount - 1}d${diceType}`,
+                label: hasUniformDiceType
+                  ? `${baseDiceCount - 1}d${resolvedDamageGroups[0]?.diceType ?? diceType}`
+                  : "Dados restantes",
                 value: remainingBaseRolls,
               },
             ]
@@ -734,6 +797,7 @@ export function CharacterId() {
               },
             ]
           : []),
+        ...groupPerDieModifiers,
         ...(totalBonus !== 0
           ? [{ label: "Bono total", value: totalBonus }]
           : []),
@@ -743,9 +807,13 @@ export function CharacterId() {
         highlightOutcome: false,
         presetRolls: baseRolls,
         chipValues:
-          perDieBonus !== 0 || totalBonus !== 0 || hasCriticalGroups
+          perDieBonus !== 0 ||
+          totalBonus !== 0 ||
+          groupPerDieModifiers.length > 0 ||
+          hasCriticalGroups
             ? chipMetadata.map((chip) => chip.value)
             : undefined,
+        chipLabels: chipMetadata.map((chip) => chip.label),
         chipTones: hasCriticalGroups
           ? chipMetadata.map((chip) => chip.tone)
           : undefined,

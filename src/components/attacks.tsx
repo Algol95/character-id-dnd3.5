@@ -6,9 +6,12 @@ import { SectionShell } from "./sectionShell";
 import type { DiceRollMode } from "@/hooks/use-dice-roller";
 import {
   DAMAGE_TYPE_LABELS,
+  type BattleActionModifierApplication,
   formatModifier,
   getCharacterAbilityModifier,
   getFullAttackBonuses,
+  getSpellDamageGroups,
+  getSpellTotalDiceCount,
   type Attack,
   type BattleActionModifier,
   type CharacterData,
@@ -38,7 +41,13 @@ interface AttacksProps {
       totalBonus: number;
       perDieBonus: number;
       baseMultiplier?: number;
-      damageGroups?: { diceCount: number; baseMultiplier?: number }[];
+      damageGroups?: {
+        diceCount: number;
+        diceType?: number;
+        damageType?: string;
+        perDieBonus?: number;
+        baseMultiplier?: number;
+      }[];
     },
   ) => void;
   weaponCriticalStates: Record<string, number[]>;
@@ -113,7 +122,8 @@ export function Attacks({
   );
 
   const resolveModifier = (modifier: BattleActionModifier) => {
-    const application = modifier.application ?? "total";
+    const application = (modifier.application ??
+      "total") as BattleActionModifierApplication;
 
     switch (modifier.source) {
       case "custom":
@@ -121,18 +131,21 @@ export function Attacks({
           label: modifier.customLabel?.trim() || "Ajuste manual",
           value: modifier.customValue ?? 0,
           application,
+          spellDamageGroupId: modifier.spellDamageGroupId,
         };
       case "baseAttackBonus":
         return {
           label: "Bono base de ataque",
           value: character.baseAttackBonus,
           application,
+          spellDamageGroupId: modifier.spellDamageGroupId,
         };
       case "initiative":
         return {
           label: "Iniciativa",
           value: character.initiative,
           application,
+          spellDamageGroupId: modifier.spellDamageGroupId,
         };
       case "strength":
       case "dexterity":
@@ -144,6 +157,7 @@ export function Attacks({
           label: `Mod. ${modifier.source}`,
           value: getCharacterAbilityModifier(character, modifier.source),
           application,
+          spellDamageGroupId: modifier.spellDamageGroupId,
         };
     }
   };
@@ -227,10 +241,46 @@ export function Attacks({
     return `${diceCount}d${diceType}${modifierSuffix}`;
   };
 
-  const summarizeModifiers = (modifiers: BattleActionModifier[]) =>
+  const formatDamageGroupsExpression = (
+    damageGroups: {
+      diceCount: number;
+      diceType: number;
+      damageType?: string;
+    }[],
+  ) =>
+    damageGroups
+      .map((group) => `${group.diceCount}d${group.diceType}`)
+      .join(" + ");
+
+  const summarizeModifiers = (
+    modifiers: BattleActionModifier[],
+    spellDamageGroups: ReturnType<typeof getSpellDamageGroups> = [],
+  ) =>
     modifiers.reduce(
       (accumulator, modifier) => {
         const resolvedModifier = resolveModifier(modifier);
+
+        if (resolvedModifier.application === "perGroup") {
+          if (spellDamageGroups.length <= 1) {
+            accumulator.perDie += resolvedModifier.value;
+            return accumulator;
+          }
+
+          const fallbackGroupId = spellDamageGroups[0]?.id;
+          const targetGroupId = spellDamageGroups.some(
+            (group) => group.id === resolvedModifier.spellDamageGroupId,
+          )
+            ? resolvedModifier.spellDamageGroupId
+            : fallbackGroupId;
+
+          if (targetGroupId) {
+            accumulator.perGroup[targetGroupId] =
+              (accumulator.perGroup[targetGroupId] ?? 0) +
+              resolvedModifier.value;
+          }
+
+          return accumulator;
+        }
 
         if (resolvedModifier.application === "perDie") {
           accumulator.perDie += resolvedModifier.value;
@@ -240,7 +290,7 @@ export function Attacks({
 
         return accumulator;
       },
-      { total: 0, perDie: 0 },
+      { total: 0, perDie: 0, perGroup: {} as Record<string, number> },
     );
 
   const formatModifierSummary = (
@@ -259,6 +309,43 @@ export function Attacks({
         `${formatModifier(perDieBonus)} por dado${diceCount > 1 ? ` (${formatModifier(perDieBonus * diceCount)})` : ""}`,
       );
     }
+
+    return parts.join(" · ");
+  };
+
+  const formatSpellModifierSummary = (
+    totalBonus: number,
+    perDieBonus: number,
+    perGroupBonuses: Record<string, number>,
+    spellDamageGroups: ReturnType<typeof getSpellDamageGroups>,
+  ) => {
+    const parts: string[] = [];
+
+    if (totalBonus !== 0) {
+      parts.push(`${formatModifier(totalBonus)} total`);
+    }
+
+    if (perDieBonus !== 0) {
+      const totalDiceCount = spellDamageGroups.reduce(
+        (total, group) => total + group.diceCount,
+        0,
+      );
+      parts.push(
+        `${formatModifier(perDieBonus)} por dado${totalDiceCount > 1 ? ` (${formatModifier(perDieBonus * totalDiceCount)})` : ""}`,
+      );
+    }
+
+    spellDamageGroups.forEach((group, index) => {
+      const groupBonus = perGroupBonuses[group.id ?? ""] ?? 0;
+
+      if (groupBonus === 0) {
+        return;
+      }
+
+      parts.push(
+        `${formatModifier(groupBonus)} por dado en grupo ${index + 1}${group.diceCount > 1 ? ` (${formatModifier(groupBonus * group.diceCount)})` : ""}`,
+      );
+    });
 
     return parts.join(" · ");
   };
@@ -312,34 +399,80 @@ export function Attacks({
 
   const getSpellExpression = (attack: Attack) => {
     const spellConfig = attack.spellConfig;
+    const damageGroups = getSpellDamageGroups(spellConfig);
     const modifierBonuses = summarizeModifiers(
       attack.spellConfig?.effectModifiers ?? [],
+      damageGroups,
+    );
+    const totalDiceCount = getSpellTotalDiceCount(spellConfig);
+    const groupSpecificModifierTotal = damageGroups.reduce(
+      (total, group) =>
+        total +
+        (modifierBonuses.perGroup[group.id ?? ""] ?? 0) * group.diceCount,
+      0,
     );
 
     if (!spellConfig) {
       return "1d6";
     }
 
-    return buildRollExpression(
-      spellConfig.damageDiceCount,
-      spellConfig.damageDiceType,
+    const baseExpression = formatDamageGroupsExpression(damageGroups);
+    const totalModifier =
       modifierBonuses.total +
-        modifierBonuses.perDie * spellConfig.damageDiceCount,
-    );
+      modifierBonuses.perDie * totalDiceCount +
+      groupSpecificModifierTotal;
+
+    return totalModifier === 0
+      ? baseExpression
+      : `${baseExpression}${totalModifier > 0 ? ` + ${totalModifier}` : ` - ${Math.abs(totalModifier)}`}`;
   };
 
   const getSpellDamageConfig = (attack: Attack) => {
     const spellConfig = attack.spellConfig;
+    const damageGroups = getSpellDamageGroups(spellConfig);
     const modifierBonuses = summarizeModifiers(
       attack.spellConfig?.effectModifiers ?? [],
+      damageGroups,
     );
 
     return {
-      diceCount: spellConfig?.damageDiceCount ?? 1,
-      diceType: spellConfig?.damageDiceType ?? 6,
+      diceCount: getSpellTotalDiceCount(spellConfig),
+      diceType: damageGroups[0]?.diceType ?? 6,
       totalBonus: modifierBonuses.total,
       perDieBonus: modifierBonuses.perDie,
+      damageGroups: damageGroups.map((group) => ({
+        ...group,
+        perDieBonus: modifierBonuses.perGroup[group.id ?? ""] ?? 0,
+      })),
     };
+  };
+
+  const getSpellTouchAttackModifiers = (attack: Attack) => {
+    const isRangedTouch = attack.spellConfig?.touchAttackType === "ranged";
+    const ability = isRangedTouch ? "dexterity" : "strength";
+
+    return [
+      {
+        label: "Bono base de ataque",
+        value: character.baseAttackBonus,
+      },
+      {
+        label: isRangedTouch ? "Mod. Destreza" : "Mod. Fuerza",
+        value: getCharacterAbilityModifier(character, ability),
+      },
+    ];
+  };
+
+  const getSpellTouchAttackBonus = (attack: Attack) =>
+    getSpellTouchAttackModifiers(attack).reduce(
+      (total, modifier) => total + modifier.value,
+      0,
+    );
+
+  const getSpellTouchAttackSummary = (attack: Attack) => {
+    const isRangedTouch = attack.spellConfig?.touchAttackType === "ranged";
+
+    return `Toque ${isRangedTouch ? "a distancia" : "cuerpo a cuerpo"} ${formatModifier(getSpellTouchAttackBonus(attack))}`;
   };
 
   const handleSaveAction = (savedAction: Attack) => {
@@ -383,6 +516,34 @@ export function Attacks({
     }));
   };
 
+  const renderAttackRollModeControls = (attack: Attack) => {
+    const selectedAttackRollMode = attackRollModes[attack.id] ?? "normal";
+
+    return (
+      <div className="flex flex-wrap items-center gap-3 pt-1 text-xs">
+        <FormCheckbox
+          checked={selectedAttackRollMode === "advantage"}
+          onChange={() => handleAttackRollModeToggle(attack.id, "advantage")}
+          ariaLabel={`Activar ventaja para ${attack.name}`}
+          label="Ventaja"
+          className="w-auto items-center gap-2"
+          boxClassName="h-3.5 w-3.5 rounded border-success/60 bg-background/40 text-success group-hover:border-success/50 peer-checked:border-success/65 peer-checked:bg-success/14 peer-checked:text-success peer-checked:shadow-[0_0_10px_rgba(34,197,94,0.22)] peer-focus-visible:ring-success"
+          labelClassName="text-xs font-medium text-success"
+        />
+
+        <FormCheckbox
+          checked={selectedAttackRollMode === "disadvantage"}
+          onChange={() => handleAttackRollModeToggle(attack.id, "disadvantage")}
+          ariaLabel={`Activar desventaja para ${attack.name}`}
+          label="Desventaja"
+          className="w-auto items-center gap-2"
+          boxClassName="h-3.5 w-3.5 rounded border-blood-red/60 bg-background/40 text-blood-red group-hover:border-blood-red/50 peer-checked:border-blood-red/65 peer-checked:bg-blood-red/14 peer-checked:text-blood-red peer-checked:shadow-[0_0_10px_rgba(127,29,29,0.2)] peer-focus-visible:ring-blood-red"
+          labelClassName="text-xs font-medium text-blood-red"
+        />
+      </div>
+    );
+  };
+
   return (
     <SectionShell
       title="ACCIONES DE BATALLA"
@@ -415,8 +576,10 @@ export function Attacks({
             const damageBonusSummary = summarizeModifiers(
               attack.weaponConfig?.damageModifiers ?? [],
             );
+            const spellDamageGroups = getSpellDamageGroups(attack.spellConfig);
             const spellBonusSummary = summarizeModifiers(
               attack.spellConfig?.effectModifiers ?? [],
+              spellDamageGroups,
             );
             const criticalAttackIndexes = weaponCriticalStates[attack.id] ?? [];
             const hasCriticalDamageState = criticalAttackIndexes.length > 0;
@@ -479,57 +642,35 @@ export function Attacks({
                                 )})`
                               : ""}
                           </div>
-                          <div className="flex flex-wrap items-center gap-3 pt-1 text-xs">
-                            <FormCheckbox
-                              checked={selectedAttackRollMode === "advantage"}
-                              onChange={() =>
-                                handleAttackRollModeToggle(
-                                  attack.id,
-                                  "advantage",
-                                )
-                              }
-                              ariaLabel={`Activar ventaja para ${attack.name}`}
-                              label="Ventaja"
-                              className="w-auto items-center gap-2"
-                              boxClassName="h-3.5 w-3.5 rounded border-success/60 bg-background/40 text-success group-hover:border-success/50 peer-checked:border-success/65 peer-checked:bg-success/14 peer-checked:text-success peer-checked:shadow-[0_0_10px_rgba(34,197,94,0.22)] peer-focus-visible:ring-success"
-                              labelClassName="text-xs font-medium text-success"
-                            />
-
-                            <FormCheckbox
-                              checked={
-                                selectedAttackRollMode === "disadvantage"
-                              }
-                              onChange={() =>
-                                handleAttackRollModeToggle(
-                                  attack.id,
-                                  "disadvantage",
-                                )
-                              }
-                              ariaLabel={`Activar desventaja para ${attack.name}`}
-                              label="Desventaja"
-                              className="w-auto items-center gap-2"
-                              boxClassName="h-3.5 w-3.5 rounded border-blood-red/60 bg-background/40 text-blood-red group-hover:border-blood-red/50 peer-checked:border-blood-red/65 peer-checked:bg-blood-red/14 peer-checked:text-blood-red peer-checked:shadow-[0_0_10px_rgba(127,29,29,0.2)] peer-focus-visible:ring-blood-red"
-                              labelClassName="text-xs font-medium text-blood-red"
-                            />
-                          </div>
+                          {renderAttackRollModeControls(attack)}
                         </>
                       ) : null}
 
                       {attack.actionType === "spell" ? (
-                        <div>
-                          Tirada {getSpellExpression(attack)}
-                          {attack.spellConfig?.damageType
-                            ? ` · ${DAMAGE_TYPE_LABELS[attack.spellConfig.damageType]}`
-                            : ""}
-                          {spellBonusSummary.total !== 0 ||
-                          spellBonusSummary.perDie !== 0
-                            ? ` · Ajustes ${formatModifierSummary(
-                                spellBonusSummary.total,
-                                spellBonusSummary.perDie,
-                                attack.spellConfig?.damageDiceCount ?? 1,
-                              )}`
-                            : ""}
-                        </div>
+                        <>
+                          <div>
+                            Tirada {getSpellExpression(attack)}
+                            {spellBonusSummary.total !== 0 ||
+                            spellBonusSummary.perDie !== 0 ||
+                            Object.values(spellBonusSummary.perGroup).some(
+                              (value) => value !== 0,
+                            )
+                              ? ` · Ajustes ${formatSpellModifierSummary(
+                                  spellBonusSummary.total,
+                                  spellBonusSummary.perDie,
+                                  spellBonusSummary.perGroup,
+                                  spellDamageGroups,
+                                )}`
+                              : ""}
+                          </div>
+
+                          {attack.spellConfig?.requiresTouchAttack ? (
+                            <>
+                              <div>{getSpellTouchAttackSummary(attack)}</div>
+                              {renderAttackRollModeControls(attack)}
+                            </>
+                          ) : null}
+                        </>
                       ) : null}
 
                       {attack.notes ? <div>{attack.notes}</div> : null}
@@ -610,30 +751,53 @@ export function Attacks({
                         ) : null}
                       </>
                     ) : (
-                      <MacroActionButton
-                        onClick={() =>
-                          onRollDamage(`${attack.name} Hechizo`, {
-                            ...getSpellDamageConfig(attack),
-                          })
-                        }
-                        title="Tirar hechizo"
-                        label="Hech"
-                      >
-                        <svg
-                          viewBox="0 0 20 20"
-                          aria-hidden="true"
-                          className="h-4 w-4"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.8"
+                      <>
+                        {attack.spellConfig?.requiresTouchAttack ? (
+                          <div className="flex flex-col items-center gap-1">
+                            <DiceButton
+                              onClick={() =>
+                                onRollAttack(
+                                  undefined,
+                                  `${attack.name} Toque`,
+                                  getSpellTouchAttackModifiers(attack),
+                                  1,
+                                  undefined,
+                                  selectedAttackRollMode,
+                                )
+                              }
+                              size="md"
+                            />
+                            <span className="text-xs text-muted-foreground">
+                              Toq
+                            </span>
+                          </div>
+                        ) : null}
+
+                        <MacroActionButton
+                          onClick={() =>
+                            onRollDamage(`${attack.name} Hechizo`, {
+                              ...getSpellDamageConfig(attack),
+                            })
+                          }
+                          title="Tirar hechizo"
+                          label="Hech"
                         >
-                          <path
-                            d="M10 2.5v3M10 14.5v3M3.5 10h3M13.5 10h3M5.6 5.6l2.1 2.1M12.3 12.3l2.1 2.1M14.4 5.6l-2.1 2.1M7.7 12.3l-2.1 2.1"
-                            strokeLinecap="round"
-                          />
-                          <circle cx="10" cy="10" r="2.5" />
-                        </svg>
-                      </MacroActionButton>
+                          <svg
+                            viewBox="0 0 20 20"
+                            aria-hidden="true"
+                            className="h-4 w-4"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                          >
+                            <path
+                              d="M10 2.5v3M10 14.5v3M3.5 10h3M13.5 10h3M5.6 5.6l2.1 2.1M12.3 12.3l2.1 2.1M14.4 5.6l-2.1 2.1M7.7 12.3l-2.1 2.1"
+                              strokeLinecap="round"
+                            />
+                            <circle cx="10" cy="10" r="2.5" />
+                          </svg>
+                        </MacroActionButton>
+                      </>
                     )}
 
                     <button

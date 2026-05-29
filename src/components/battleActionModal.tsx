@@ -8,6 +8,8 @@ import {
   DAMAGE_TYPE_LABELS,
   DAMAGE_TYPE_OPTIONS,
   getFullAttackBonuses,
+  getSpellDamageGroups,
+  getSpellTotalDiceCount,
   type BattleActionModifierApplication,
   type DamageType,
   formatModifier,
@@ -15,6 +17,8 @@ import {
   type Attack,
   type BattleActionModifier,
   type BattleActionModifierSource,
+  type SpellDamageGroup,
+  type SpellTouchAttackType,
   type BattleActionWeaponSnapshot,
   type CharacterData,
   type EquippedItem,
@@ -72,6 +76,11 @@ const MODIFIER_APPLICATION_OPTIONS: FormSelectOption[] = [
   { value: "perDie", label: "A cada dado" },
 ];
 
+const SPELL_TOUCH_ATTACK_TYPE_OPTIONS: FormSelectOption[] = [
+  { value: "melee", label: "Toque cuerpo a cuerpo" },
+  { value: "ranged", label: "Toque a distancia" },
+];
+
 const DAMAGE_DICE_OPTIONS: FormSelectOption[] = DAMAGE_DICE_TYPES.map(
   (dice) => ({
     value: String(dice.sides),
@@ -114,8 +123,20 @@ function createDefaultSpellConfig() {
   return {
     damageDiceCount: 1,
     damageDiceType: 6,
+    damageDiceGroups: [createEmptySpellDamageGroup()],
     damageType: undefined,
+    requiresTouchAttack: false,
+    touchAttackType: "melee" as const,
     effectModifiers: [],
+  };
+}
+
+function createEmptySpellDamageGroup(): SpellDamageGroup {
+  return {
+    id: createBattleActionId("spell-dice"),
+    diceCount: 1,
+    diceType: 6,
+    damageType: undefined,
   };
 }
 
@@ -130,8 +151,59 @@ function createEmptyModifier(): BattleActionModifier {
 function getEffectiveModifierApplication(
   modifier: BattleActionModifier,
   diceCount: number,
+  spellDamageGroups: SpellDamageGroup[] = [],
 ) {
-  return diceCount <= 1 ? "perDie" : (modifier.application ?? "total");
+  const hasMultipleSpellGroups = spellDamageGroups.length > 1;
+
+  if (diceCount <= 1 && !hasMultipleSpellGroups) {
+    return "perDie";
+  }
+
+  if (modifier.application === "perGroup") {
+    return modifier.spellDamageGroupId &&
+      spellDamageGroups.some(
+        (group) => group.id === modifier.spellDamageGroupId,
+      )
+      ? "perGroup"
+      : hasMultipleSpellGroups
+        ? "total"
+        : "perDie";
+  }
+
+  return modifier.application ?? "total";
+}
+
+function getSpellDamageGroupOptionLabel(
+  group: SpellDamageGroup,
+  index: number,
+) {
+  return `Grupo ${index + 1} (${group.diceCount}d${group.diceType})`;
+}
+
+function getModifierAffectedDiceCount(
+  modifier: BattleActionModifier,
+  diceCount: number,
+  spellDamageGroups: SpellDamageGroup[] = [],
+) {
+  const application = getEffectiveModifierApplication(
+    modifier,
+    diceCount,
+    spellDamageGroups,
+  );
+
+  if (application === "perDie") {
+    return diceCount;
+  }
+
+  if (application === "perGroup") {
+    return (
+      spellDamageGroups.find(
+        (group) => group.id === modifier.spellDamageGroupId,
+      )?.diceCount ?? 0
+    );
+  }
+
+  return 1;
 }
 
 function cloneModifier(modifier: BattleActionModifier): BattleActionModifier {
@@ -160,7 +232,15 @@ function cloneAction(action: Attack): Attack {
           ...action.spellConfig,
           damageDiceCount: action.spellConfig.damageDiceCount,
           damageDiceType: action.spellConfig.damageDiceType,
+          damageDiceGroups: getSpellDamageGroups(action.spellConfig).map(
+            (group) => ({ ...group }),
+          ),
           damageType: action.spellConfig.damageType,
+          requiresTouchAttack: Boolean(action.spellConfig.requiresTouchAttack),
+          touchAttackType:
+            action.spellConfig.touchAttackType === "ranged"
+              ? "ranged"
+              : "melee",
           effectModifiers:
             action.spellConfig.effectModifiers.map(cloneModifier),
         }
@@ -218,31 +298,57 @@ function resolveModifierPreviewValue(
   character: CharacterData,
   modifier: BattleActionModifier,
   diceCount: number,
+  spellDamageGroups: SpellDamageGroup[] = [],
 ): number {
   const baseValue = resolveModifierSourceValue(character, modifier);
+  const affectedDiceCount = getModifierAffectedDiceCount(
+    modifier,
+    diceCount,
+    spellDamageGroups,
+  );
 
-  return getEffectiveModifierApplication(modifier, diceCount) === "perDie"
-    ? baseValue * diceCount
-    : baseValue;
+  return affectedDiceCount > 1 ? baseValue * affectedDiceCount : baseValue;
 }
 
 function getModifierPreviewDescription(
   character: CharacterData,
   modifier: BattleActionModifier,
   diceCount: number,
+  spellDamageGroups: SpellDamageGroup[] = [],
 ) {
-  const application = getEffectiveModifierApplication(modifier, diceCount);
+  const application = getEffectiveModifierApplication(
+    modifier,
+    diceCount,
+    spellDamageGroups,
+  );
   const sourceValue = resolveModifierSourceValue(character, modifier);
   const previewValue = resolveModifierPreviewValue(
     character,
     modifier,
     diceCount,
+    spellDamageGroups,
   );
+  const targetGroupIndex = spellDamageGroups.findIndex(
+    (group) => group.id === modifier.spellDamageGroupId,
+  );
+  const targetGroup =
+    targetGroupIndex >= 0 ? spellDamageGroups[targetGroupIndex] : null;
 
   if (application === "perDie") {
     return diceCount > 1
       ? `${formatModifier(previewValue)} total (${formatModifier(sourceValue)} por dado)`
       : `${formatModifier(sourceValue)} por dado`;
+  }
+
+  if (application === "perGroup" && targetGroup) {
+    const groupLabel = getSpellDamageGroupOptionLabel(
+      targetGroup,
+      targetGroupIndex,
+    );
+
+    return targetGroup.diceCount > 1
+      ? `${formatModifier(previewValue)} total (${formatModifier(sourceValue)} por dado en ${groupLabel})`
+      : `${formatModifier(sourceValue)} por dado en ${groupLabel}`;
   }
 
   return `${formatModifier(previewValue)} al total`;
@@ -251,10 +357,16 @@ function getModifierPreviewDescription(
 function normalizeModifier(
   modifier: BattleActionModifier,
 ): BattleActionModifier {
+  const normalizedApplication = modifier.application ?? "total";
+
   if (modifier.source === "custom") {
     return {
       ...modifier,
-      application: modifier.application ?? "total",
+      application: normalizedApplication,
+      spellDamageGroupId:
+        normalizedApplication === "perGroup"
+          ? modifier.spellDamageGroupId
+          : undefined,
       customLabel: modifier.customLabel?.trim() || "Ajuste manual",
       customValue: modifier.customValue ?? 0,
     };
@@ -263,7 +375,11 @@ function normalizeModifier(
   return {
     id: modifier.id,
     source: modifier.source,
-    application: modifier.application ?? "total",
+    application: normalizedApplication,
+    spellDamageGroupId:
+      normalizedApplication === "perGroup"
+        ? modifier.spellDamageGroupId
+        : undefined,
   };
 }
 
@@ -434,6 +550,7 @@ interface ModifierListEditorProps {
   allowPerDie?: boolean;
   diceCount?: number;
   sourceOptions?: FormSelectOption[];
+  spellDamageGroups?: SpellDamageGroup[];
 }
 
 function ModifierListEditor({
@@ -445,15 +562,36 @@ function ModifierListEditor({
   allowPerDie = false,
   diceCount = 1,
   sourceOptions = MODIFIER_SOURCE_OPTIONS,
+  spellDamageGroups = [],
 }: ModifierListEditorProps) {
+  const applicationOptions = useMemo(() => {
+    if (!allowPerDie || spellDamageGroups.length <= 1) {
+      return MODIFIER_APPLICATION_OPTIONS;
+    }
+
+    return [
+      ...MODIFIER_APPLICATION_OPTIONS,
+      ...spellDamageGroups.map((group, index) => ({
+        value: `group:${group.id}`,
+        label: `A cada dado del ${getSpellDamageGroupOptionLabel(group, index)}`,
+      })),
+    ];
+  }, [allowPerDie, spellDamageGroups]);
+
   const previewTotal = useMemo(
     () =>
       modifiers.reduce(
         (total, modifier) =>
-          total + resolveModifierPreviewValue(character, modifier, diceCount),
+          total +
+          resolveModifierPreviewValue(
+            character,
+            modifier,
+            diceCount,
+            spellDamageGroups,
+          ),
         0,
       ),
-    [character, diceCount, modifiers],
+    [character, diceCount, modifiers, spellDamageGroups],
   );
 
   const updateModifier = (
@@ -606,24 +744,36 @@ function ModifierListEditor({
                       character,
                       modifier,
                       diceCount,
+                      spellDamageGroups,
                     )}
                   </div>
                 )}
 
-                {allowPerDie && diceCount > 1 ? (
+                {allowPerDie &&
+                (diceCount > 1 || spellDamageGroups.length > 1) ? (
                   <label className="mt-3 block">
                     <span className="mb-1.5 block text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
                       Como se aplica
                     </span>
                     <FormSelect
-                      value={modifier.application ?? "total"}
+                      value={
+                        modifier.application === "perGroup" &&
+                        modifier.spellDamageGroupId
+                          ? `group:${modifier.spellDamageGroupId}`
+                          : (modifier.application ?? "total")
+                      }
                       onChange={(value) =>
                         updateModifier(modifier.id, (currentModifier) => ({
                           ...currentModifier,
-                          application: value as BattleActionModifierApplication,
+                          application: value.startsWith("group:")
+                            ? "perGroup"
+                            : (value as BattleActionModifierApplication),
+                          spellDamageGroupId: value.startsWith("group:")
+                            ? value.slice("group:".length)
+                            : undefined,
                         }))
                       }
-                      options={MODIFIER_APPLICATION_OPTIONS}
+                      options={applicationOptions}
                       ariaLabel={`Aplicacion para ${title}`}
                     />
                   </label>
@@ -682,6 +832,8 @@ export function BattleActionModal({
 
   const currentWeaponConfig = draft.weaponConfig;
   const currentSpellConfig = draft.spellConfig;
+  const currentSpellDamageGroups = getSpellDamageGroups(currentSpellConfig);
+  const currentSpellTotalDiceCount = getSpellTotalDiceCount(currentSpellConfig);
   const selectedEquippedWeapon =
     currentWeaponConfig?.source === "equipped"
       ? (equippedWeapons.find(
@@ -711,10 +863,7 @@ export function BattleActionModal({
   const canSave =
     draft.name.trim().length > 0 &&
     (draft.actionType === "spell"
-      ? Boolean(
-          currentSpellConfig?.damageDiceCount &&
-          currentSpellConfig?.damageDiceType,
-        )
+      ? currentSpellDamageGroups.length > 0
       : currentWeaponConfig?.source === "equipped"
         ? Boolean(currentWeaponConfig.selectedWeaponId || equippedWeapons[0])
         : Boolean(currentWeaponConfig?.weaponSnapshot.name.trim()));
@@ -761,6 +910,58 @@ export function BattleActionModal({
     }));
   };
 
+  const updateSpellDamageGroups = (
+    updater: (groups: SpellDamageGroup[]) => SpellDamageGroup[],
+  ) => {
+    setSpellConfig((currentConfig) => {
+      const nextGroups = updater(getSpellDamageGroups(currentConfig)).map(
+        (group, index) => ({
+          ...group,
+          id: group.id ?? createBattleActionId(`spell-dice-${index + 1}`),
+        }),
+      );
+      const primaryGroup = nextGroups[0] ?? createEmptySpellDamageGroup();
+      const nextEffectModifiers = currentConfig.effectModifiers.map(
+        (modifier) => {
+          if (modifier.application !== "perGroup") {
+            return {
+              ...modifier,
+              spellDamageGroupId: undefined,
+            };
+          }
+
+          if (nextGroups.length <= 1) {
+            return {
+              ...modifier,
+              application: "perDie" as const,
+              spellDamageGroupId: undefined,
+            };
+          }
+
+          const hasCurrentGroup = nextGroups.some(
+            (group) => group.id === modifier.spellDamageGroupId,
+          );
+
+          return {
+            ...modifier,
+            spellDamageGroupId: hasCurrentGroup
+              ? modifier.spellDamageGroupId
+              : nextGroups[0]?.id,
+          };
+        },
+      );
+
+      return {
+        ...currentConfig,
+        damageDiceGroups: nextGroups,
+        damageDiceCount: primaryGroup.diceCount,
+        damageDiceType: primaryGroup.diceType,
+        damageType: primaryGroup.damageType,
+        effectModifiers: nextEffectModifiers,
+      };
+    });
+  };
+
   const handleSave = () => {
     if (!canSave) {
       return;
@@ -771,24 +972,45 @@ export function BattleActionModal({
     const spellConfig = draft.spellConfig;
 
     if (draft.actionType === "spell" && spellConfig) {
+      const normalizedSpellDamageGroups = getSpellDamageGroups(spellConfig).map(
+        (group, index) => ({
+          ...group,
+          id: group.id ?? createBattleActionId(`spell-dice-${index + 1}`),
+        }),
+      );
+      const primarySpellDamageGroup =
+        normalizedSpellDamageGroups[0] ?? createEmptySpellDamageGroup();
+      const totalSpellDiceCount = normalizedSpellDamageGroups.reduce(
+        (total, group) => total + group.diceCount,
+        0,
+      );
+
       onSave({
         id: draft.id || createBattleActionId(),
         name: trimmedName,
         actionType: "spell",
         notes: trimmedNotes,
         spellConfig: {
-          damageDiceCount: Math.max(1, spellConfig.damageDiceCount),
-          damageDiceType: spellConfig.damageDiceType,
-          damageType: spellConfig.damageType,
+          damageDiceCount: primarySpellDamageGroup.diceCount,
+          damageDiceType: primarySpellDamageGroup.diceType,
+          damageDiceGroups: normalizedSpellDamageGroups,
+          damageType: primarySpellDamageGroup.damageType,
+          requiresTouchAttack: Boolean(spellConfig.requiresTouchAttack),
+          touchAttackType:
+            spellConfig.touchAttackType === "ranged" ? "ranged" : "melee",
           effectModifiers: spellConfig.effectModifiers.map((modifier) => {
             const normalizedModifier = normalizeModifier(modifier);
 
             return {
               ...normalizedModifier,
               application:
-                spellConfig.damageDiceCount <= 1
+                totalSpellDiceCount <= 1
                   ? "perDie"
                   : normalizedModifier.application,
+              spellDamageGroupId:
+                totalSpellDiceCount <= 1
+                  ? undefined
+                  : normalizedModifier.spellDamageGroupId,
             };
           }),
         },
@@ -1204,68 +1426,172 @@ export function BattleActionModal({
           {draft.actionType === "spell" && currentSpellConfig ? (
             <>
               <div className="rounded-2xl border border-border/60 bg-secondary/15 p-4">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="block">
-                    <span className="mb-1.5 block text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-                      Cantidad de dados
-                    </span>
-                    <FormNumberInput
-                      value={currentSpellConfig.damageDiceCount}
-                      onChange={(value) =>
-                        setSpellConfig((currentConfig) => ({
-                          ...currentConfig,
-                          damageDiceCount: Number.parseInt(value, 10) || 1,
-                        }))
-                      }
-                      min={1}
-                      className="w-full"
-                      inputClassName="rounded-xl px-3 py-2 text-center text-sm"
-                      ariaLabel="Cantidad de dados del hechizo"
-                    />
-                  </label>
+                <div className="space-y-3">
+                  {currentSpellDamageGroups.map((group, index) => (
+                    <div
+                      key={group.id ?? `spell-dice-${index}`}
+                      className="rounded-xl border border-border/55 bg-background/20 p-3"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-[11px] uppercase tracking-[0.16em] text-gold/80">
+                          Grupo de dados {index + 1}
+                        </div>
 
-                  <label className="block">
-                    <span className="mb-1.5 block text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-                      Dado del hechizo o efecto
-                    </span>
-                    <FormSelect
-                      value={String(currentSpellConfig.damageDiceType)}
-                      onChange={(value) =>
-                        setSpellConfig((currentConfig) => ({
-                          ...currentConfig,
-                          damageDiceType: Number.parseInt(value, 10) || 6,
-                        }))
-                      }
-                      options={DAMAGE_DICE_OPTIONS}
-                      ariaLabel="Dado del hechizo"
-                    />
-                  </label>
+                        {currentSpellDamageGroups.length > 1 ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              updateSpellDamageGroups((groups) =>
+                                groups.filter(
+                                  (currentGroup) =>
+                                    currentGroup.id !== group.id,
+                                ),
+                              )
+                            }
+                            className="rounded-full border border-border/60 bg-background/20 px-3 py-1 text-xs text-muted-foreground transition-colors hover:border-blood-red/40 hover:text-blood-red"
+                          >
+                            Quitar grupo
+                          </button>
+                        ) : null}
+                      </div>
 
-                  <label className="block sm:col-span-2">
-                    <span className="mb-1.5 block text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-                      Tipo de dano
-                    </span>
-                    <FormSelect
-                      value={currentSpellConfig.damageType ?? ""}
-                      onChange={(value) =>
-                        setSpellConfig((currentConfig) => ({
-                          ...currentConfig,
-                          damageType:
-                            value.trim().length > 0
-                              ? (value as DamageType)
-                              : undefined,
-                        }))
-                      }
-                      options={DAMAGE_TYPE_SELECT_OPTIONS}
-                      ariaLabel="Tipo de dano del hechizo"
-                    />
-                  </label>
+                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                        <label className="block">
+                          <span className="mb-1.5 block text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                            Cantidad de dados
+                          </span>
+                          <FormNumberInput
+                            value={group.diceCount}
+                            onChange={(value) =>
+                              updateSpellDamageGroups((groups) =>
+                                groups.map((currentGroup) =>
+                                  currentGroup.id === group.id
+                                    ? {
+                                        ...currentGroup,
+                                        diceCount:
+                                          Number.parseInt(value, 10) || 1,
+                                      }
+                                    : currentGroup,
+                                ),
+                              )
+                            }
+                            min={1}
+                            className="w-full"
+                            inputClassName="rounded-xl px-3 py-2 text-center text-sm"
+                            ariaLabel={`Cantidad de dados del grupo ${index + 1}`}
+                          />
+                        </label>
+
+                        <label className="block">
+                          <span className="mb-1.5 block text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                            Dado del hechizo o efecto
+                          </span>
+                          <FormSelect
+                            value={String(group.diceType)}
+                            onChange={(value) =>
+                              updateSpellDamageGroups((groups) =>
+                                groups.map((currentGroup) =>
+                                  currentGroup.id === group.id
+                                    ? {
+                                        ...currentGroup,
+                                        diceType:
+                                          Number.parseInt(value, 10) || 6,
+                                      }
+                                    : currentGroup,
+                                ),
+                              )
+                            }
+                            options={DAMAGE_DICE_OPTIONS}
+                            ariaLabel={`Dado del grupo ${index + 1}`}
+                          />
+                        </label>
+
+                        <label className="block sm:col-span-2">
+                          <span className="mb-1.5 block text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                            Tipo de dano de este grupo
+                          </span>
+                          <FormSelect
+                            value={group.damageType ?? ""}
+                            onChange={(value) =>
+                              updateSpellDamageGroups((groups) =>
+                                groups.map((currentGroup) =>
+                                  currentGroup.id === group.id
+                                    ? {
+                                        ...currentGroup,
+                                        damageType:
+                                          value.trim().length > 0
+                                            ? (value as DamageType)
+                                            : undefined,
+                                      }
+                                    : currentGroup,
+                                ),
+                              )
+                            }
+                            options={DAMAGE_TYPE_SELECT_OPTIONS}
+                            ariaLabel={`Tipo de dano del grupo ${index + 1}`}
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  ))}
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateSpellDamageGroups((groups) => [
+                        ...groups,
+                        createEmptySpellDamageGroup(),
+                      ])
+                    }
+                    className="rounded-full border border-gold/35 bg-gold/10 px-3 py-1 text-xs text-gold transition-colors hover:bg-gold/15"
+                  >
+                    + Anadir grupo de dados
+                  </button>
                 </div>
               </div>
 
               <div className="rounded-2xl border border-border/60 bg-secondary/15 p-4 text-sm leading-6 text-muted-foreground">
-                Configura la base del hechizo igual que un arma: cantidad de
-                dados y tipo de dado. Los ajustes extra se sumaran despues.
+                Configura uno o varios grupos de dados para el hechizo. Los
+                ajustes extra se sumaran despues sobre el total o por dado.
+              </div>
+
+              <div className="rounded-2xl border border-border/60 bg-secondary/15 p-4">
+                <div className="space-y-3">
+                  <FormCheckbox
+                    checked={Boolean(currentSpellConfig.requiresTouchAttack)}
+                    onChange={(checked) =>
+                      setSpellConfig((currentConfig) => ({
+                        ...currentConfig,
+                        requiresTouchAttack: checked,
+                        touchAttackType: checked
+                          ? (currentConfig.touchAttackType ?? "melee")
+                          : currentConfig.touchAttackType,
+                      }))
+                    }
+                    ariaLabel="Indicar si el hechizo requiere tirada de toque"
+                    label="Requiere tirada de toque"
+                    description="Si lo activas, la macro podra tirar un d20 para impactar con toque usando BAB + STR o BAB + DEX."
+                  />
+
+                  {currentSpellConfig.requiresTouchAttack ? (
+                    <label className="block max-w-sm">
+                      <span className="mb-1.5 block text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                        Tipo de toque
+                      </span>
+                      <FormSelect
+                        value={currentSpellConfig.touchAttackType ?? "melee"}
+                        onChange={(value) =>
+                          setSpellConfig((currentConfig) => ({
+                            ...currentConfig,
+                            touchAttackType: value as SpellTouchAttackType,
+                          }))
+                        }
+                        options={SPELL_TOUCH_ATTACK_TYPE_OPTIONS}
+                        ariaLabel="Tipo de toque del hechizo"
+                      />
+                    </label>
+                  ) : null}
+                </div>
               </div>
             </>
           ) : null}
@@ -1328,7 +1654,8 @@ export function BattleActionModal({
               character={character}
               modifiers={currentSpellConfig.effectModifiers}
               allowPerDie
-              diceCount={currentSpellConfig.damageDiceCount}
+              diceCount={currentSpellTotalDiceCount}
+              spellDamageGroups={currentSpellDamageGroups}
               onChange={(effectModifiers) =>
                 setSpellConfig((currentConfig) => ({
                   ...currentConfig,

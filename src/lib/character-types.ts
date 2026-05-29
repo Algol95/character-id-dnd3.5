@@ -114,6 +114,12 @@ export const DAMAGE_TYPE_LABELS: Record<DamageType, string> = {
   necrotic: "Necrotico",
 };
 
+const OFFICIAL_DAMAGE_DICE_TYPE_SET = new Set([4, 6, 8, 10, 12]);
+
+export function normalizeDamageDiceType(diceType?: number): number {
+  return diceType && OFFICIAL_DAMAGE_DICE_TYPE_SET.has(diceType) ? diceType : 6;
+}
+
 export function getFullAttackBonuses(attackBonus: number): number[] {
   const normalizedAttackBonus = Number.isFinite(attackBonus)
     ? Math.trunc(attackBonus)
@@ -142,12 +148,13 @@ export type BattleActionModifierSource =
   | "initiative"
   | "custom";
 
-export type BattleActionModifierApplication = "total" | "perDie";
+export type BattleActionModifierApplication = "total" | "perDie" | "perGroup";
 
 export interface BattleActionModifier {
   id: string;
   source: BattleActionModifierSource;
   application?: BattleActionModifierApplication;
+  spellDamageGroupId?: string;
   customLabel?: string;
   customValue?: number;
 }
@@ -168,11 +175,53 @@ export interface WeaponAttackConfig {
   damageModifiers: BattleActionModifier[];
 }
 
+export type SpellTouchAttackType = "melee" | "ranged";
+
 export interface SpellAttackConfig {
   damageDiceCount: number;
   damageDiceType: number;
+  damageDiceGroups?: SpellDamageGroup[];
   damageType?: DamageType;
+  requiresTouchAttack?: boolean;
+  touchAttackType?: SpellTouchAttackType;
   effectModifiers: BattleActionModifier[];
+}
+
+export interface SpellDamageGroup {
+  id?: string;
+  diceCount: number;
+  diceType: number;
+  damageType?: DamageType;
+}
+
+export function getSpellDamageGroups(
+  spellConfig?: Partial<SpellAttackConfig> | null,
+): SpellDamageGroup[] {
+  const damageDiceGroups =
+    spellConfig?.damageDiceGroups && spellConfig.damageDiceGroups.length > 0
+      ? spellConfig.damageDiceGroups
+      : [
+          {
+            diceCount: spellConfig?.damageDiceCount ?? 1,
+            diceType: spellConfig?.damageDiceType ?? 6,
+          },
+        ];
+
+  return damageDiceGroups.map((group, index) => ({
+    id: group.id ?? `spell-dice-${index}`,
+    diceCount: Math.max(1, Math.trunc(group.diceCount ?? 1) || 1),
+    diceType: normalizeDamageDiceType(group.diceType),
+    damageType: group.damageType ?? spellConfig?.damageType,
+  }));
+}
+
+export function getSpellTotalDiceCount(
+  spellConfig?: Partial<SpellAttackConfig> | null,
+): number {
+  return getSpellDamageGroups(spellConfig).reduce(
+    (total, group) => total + group.diceCount,
+    0,
+  );
 }
 
 export interface Attack {

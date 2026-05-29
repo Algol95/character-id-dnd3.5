@@ -42,6 +42,7 @@ interface ResultAppearance {
 interface RollChipProps {
   value: number;
   originalValue?: number;
+  label?: string;
   isSelected: boolean;
   tone?: "default" | "critical" | "fumble";
 }
@@ -165,6 +166,7 @@ function DiceValue({
 function RollChip({
   value,
   originalValue,
+  label,
   isSelected,
   tone = "default",
 }: RollChipProps) {
@@ -188,9 +190,14 @@ function RollChip({
     <div
       className={`min-w-16 rounded-xl border px-3 py-2 text-center transition-colors ${toneClasses}`}
     >
+      {label ? (
+        <div className="text-[10px] uppercase tracking-[0.16em] text-gold-dim/85">
+          {label}
+        </div>
+      ) : null}
       {originalValue !== undefined ? (
         <div
-          className={`text-[10px] uppercase tracking-[0.16em] ${originalValueClass}`}
+          className={`text-[10px] uppercase tracking-[0.16em] ${label ? "mt-1 " : ""}${originalValueClass}`}
         >
           base {originalValue}
         </div>
@@ -686,6 +693,7 @@ export function DiceRollModal({
                       ? rollValue
                       : undefined
                   }
+                  label={result.chipLabels?.[index]}
                   isSelected={isSelectedRoll(index)}
                   tone={getRollChipTone(index)}
                 />
