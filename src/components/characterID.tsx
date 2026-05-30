@@ -647,6 +647,13 @@ export function CharacterId() {
     [handleRoll],
   );
 
+  const handleSimpleAttackRoll = useCallback(
+    (attackName: string, modifiers: RollModifier[]) => {
+      handleNamedRoll(undefined, attackName, modifiers);
+    },
+    [handleNamedRoll],
+  );
+
   const handleDamageRoll = useCallback(
     (
       attackName: string,
@@ -900,6 +907,7 @@ export function CharacterId() {
                   onChange={handleChange}
                   onRollAbility={handleAbilityRoll}
                   onRollInitiative={handleInitiativeRoll}
+                  onRollAttack={handleSimpleAttackRoll}
                   isOpen={visibleSections.abilities}
                   onToggle={() => toggleSection("abilities")}
                 />

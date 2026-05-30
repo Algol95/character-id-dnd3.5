@@ -4,6 +4,8 @@ import { SectionShell } from "./sectionShell";
 import {
   formatModifier,
   getAbilityModifier,
+  getCharacterAbilityModifier,
+  getSizeGrappleModifier,
   type CharacterData,
 } from "@/lib/character-types";
 import type { EquipmentBonuses } from "@/lib/equipment-effects";
@@ -17,6 +19,10 @@ interface AbilityScoresProps {
   onChange: (updates: Partial<CharacterData>) => void;
   onRollAbility: (ability: string, modifier: number) => void;
   onRollInitiative: (modifiers: { label: string; value: number }[]) => void;
+  onRollAttack: (
+    attackName: string,
+    modifiers: { label: string; value: number }[],
+  ) => void;
   isOpen?: boolean;
   onToggle?: () => void;
 }
@@ -60,18 +66,29 @@ export function AbilityScores({
   onChange,
   onRollAbility,
   onRollInitiative,
+  onRollAttack,
   isOpen,
   onToggle,
 }: AbilityScoresProps) {
-  const dexMod = getAbilityModifier(
-    character.dexterity + equipmentBonuses.abilityBonuses.dexterity,
+  const dexMod = getCharacterAbilityModifier(
+    character,
+    "dexterity",
+    equipmentBonuses.abilityBonuses.dexterity,
   );
+  const strMod = getCharacterAbilityModifier(
+    character,
+    "strength",
+    equipmentBonuses.abilityBonuses.strength,
+  );
+  const grappleSizeMod = getSizeGrappleModifier(character.size);
   const initiativeTotal =
     dexMod + character.initiative + equipmentBonuses.initiative;
   const armorClassTotal = character.armorClass + equipmentBonuses.armorClass;
   const touchACTotal = character.touchAC + equipmentBonuses.touchAC;
   const flatFootedACTotal =
     character.flatFootedAC + equipmentBonuses.flatFootedAC;
+  const grappleTotal =
+    character.grappleMisc + character.baseAttackBonus + strMod + grappleSizeMod;
   const speedTotal = character.speed + equipmentBonuses.speed;
   const hpCurrent = character.currentHp;
   const hpMax = Math.max(character.hp, 0);
@@ -420,6 +437,53 @@ export function AbilityScores({
                   ariaLabel="Bono base de ataque"
                   compact
                 />
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-border/60 bg-background/20 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                    Presa
+                  </p>
+                  <p className="mt-3 text-3xl font-bold leading-none text-gold">
+                    {formatModifier(grappleTotal)}
+                  </p>
+                </div>
+
+                <DiceButton
+                  size="sm"
+                  onClick={() =>
+                    onRollAttack("Presa", [
+                      { label: "BBA", value: character.baseAttackBonus },
+                      { label: "STR", value: strMod },
+                      { label: "Tamano", value: grappleSizeMod },
+                      ...(character.grappleMisc !== 0
+                        ? [{ label: "Varios", value: character.grappleMisc }]
+                        : []),
+                    ])
+                  }
+                />
+              </div>
+
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                <span>{formatModifier(character.baseAttackBonus)} BBA</span>
+                <span>+</span>
+                <span>{formatModifier(strMod)} STR</span>
+                <span>+</span>
+                <span>{formatModifier(grappleSizeMod)} tam.</span>
+                <span>+</span>
+                <FormNumberInput
+                  value={character.grappleMisc}
+                  onChange={(value) =>
+                    onChange({ grappleMisc: parseInt(value, 10) || 0 })
+                  }
+                  className="w-12"
+                  inputClassName="rounded bg-input py-0.5 text-center text-sm"
+                  ariaLabel="Modificador varios de presa"
+                  compact
+                />
+                <span>varios</span>
               </div>
             </div>
 

@@ -140,6 +140,22 @@ export function getFullAttackBonuses(attackBonus: number): number[] {
   return bonuses;
 }
 
+export const SIZE_GRAPPLE_MODIFIERS: Record<string, number> = {
+  Fine: -16,
+  Diminutive: -12,
+  Tiny: -8,
+  Small: -4,
+  Medium: 0,
+  Large: 4,
+  Huge: 8,
+  Gargantuan: 12,
+  Colossal: 16,
+};
+
+export function getSizeGrappleModifier(size?: string): number {
+  return SIZE_GRAPPLE_MODIFIERS[size ?? "Medium"] ?? 0;
+}
+
 export type BattleActionType = "weapon" | "spell";
 
 export type BattleActionModifierSource =
@@ -289,6 +305,7 @@ export interface CharacterData {
   touchAC: number;
   flatFootedAC: number;
   baseAttackBonus: number;
+  grappleMisc: number;
   speed: number;
   attacks: Attack[];
   skills: Skill[];
@@ -564,6 +581,7 @@ export const DEFAULT_CHARACTER: CharacterData = {
   touchAC: 10,
   flatFootedAC: 10,
   baseAttackBonus: 0,
+  grappleMisc: 0,
   speed: 30,
   attacks: [],
   skills: DEFAULT_SKILLS,

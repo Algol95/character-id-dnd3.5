@@ -2,7 +2,7 @@ import { FormNumberInput } from "@/components/formNumberInput";
 import { SectionShell } from "./sectionShell";
 import {
   formatModifier,
-  getAbilityModifier,
+  getCharacterAbilityModifier,
   type CharacterData,
 } from "@/lib/character-types";
 import type { EquipmentBonuses } from "@/lib/equipment-effects";
@@ -71,11 +71,15 @@ export function Combat({
   isOpen,
   onToggle,
 }: CombatProps) {
-  const dexMod = getAbilityModifier(
-    character.dexterity + equipmentBonuses.abilityBonuses.dexterity,
+  const dexMod = getCharacterAbilityModifier(
+    character,
+    "dexterity",
+    equipmentBonuses.abilityBonuses.dexterity,
   );
-  const strMod = getAbilityModifier(
-    character.strength + equipmentBonuses.abilityBonuses.strength,
+  const strMod = getCharacterAbilityModifier(
+    character,
+    "strength",
+    equipmentBonuses.abilityBonuses.strength,
   );
   const initiativeTotal =
     dexMod + character.initiative + equipmentBonuses.initiative;
