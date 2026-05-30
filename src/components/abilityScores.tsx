@@ -90,14 +90,16 @@ export function AbilityScores({
   const grappleTotal =
     character.grappleMisc + character.baseAttackBonus + strMod + grappleSizeMod;
   const speedTotal = character.speed + equipmentBonuses.speed;
-  const hpCurrent = character.currentHp;
+  const rawCurrentHp = character.currentHp;
+  const nonlethalDamage = Math.max(character.nonlethalDamage, 0);
+  const hpCurrent = rawCurrentHp - nonlethalDamage;
   const hpMax = Math.max(character.hp, 0);
   const hpSafeMax = Math.max(hpMax, 1);
   const hpRatio = hpCurrent / hpSafeMax;
   const hpBarRatio = Math.max(0, Math.min(hpRatio, 1));
   const hpPercentage = Math.round(hpBarRatio * 100);
-  const isDead = hpCurrent <= -10;
-  const isUnconscious = hpCurrent <= 0 && hpCurrent > -10;
+  const isDead = rawCurrentHp <= -10;
+  const isUnconscious = !isDead && hpCurrent <= 0;
   const hpStatusLabel = isDead
     ? ""
     : isUnconscious
@@ -260,7 +262,7 @@ export function AbilityScores({
                     Dano no letal
                   </span>
                   <p className="mt-1 text-xs text-foreground/70">
-                    Se acumula por separado del dano normal.
+                    Se descuenta de los PG actuales mostrados.
                   </p>
                 </div>
                 <FormNumberInput
