@@ -2,8 +2,9 @@ import { useMemo, useState } from "react";
 import { FormCheckbox } from "@/components/formCheckbox";
 import { FormNumberInput } from "@/components/formNumberInput";
 import { FormSelect, type FormSelectOption } from "@/components/formSelect";
+import { DAMAGE_DICE_TYPES } from "../lib/damage-dice";
 import { Modal } from "./modal";
-import { DAMAGE_DICE_TYPES, DiceIcon } from "./diceIcon";
+import { DiceIcon } from "./diceIcon";
 import {
   DAMAGE_TYPE_LABELS,
   DAMAGE_TYPE_OPTIONS,

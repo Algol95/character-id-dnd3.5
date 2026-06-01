@@ -2,12 +2,12 @@ import { useMemo, useState } from "react";
 import { FormCheckbox } from "@/components/formCheckbox";
 import { FormNumberInput } from "@/components/formNumberInput";
 import { FormSelect, type FormSelectOption } from "@/components/formSelect";
-import { Modal } from "./modal";
 import {
   DAMAGE_DICE_TYPES,
-  DiceIcon,
   isOfficialDamageDiceType,
-} from "./diceIcon";
+} from "../lib/damage-dice";
+import { Modal } from "./modal";
+import { DiceIcon } from "./diceIcon";
 import {
   type EquipmentEffectTarget,
   type EquipmentSlot,

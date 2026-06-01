@@ -465,7 +465,13 @@ export function DiceRollModal({
       key: "",
       decisions: {},
     });
-  const [activeRollIndex, setActiveRollIndex] = useState(0);
+  const [activeRollSelection, setActiveRollSelection] = useState<{
+    rollInstanceId: number | null;
+    index: number | null;
+  }>({
+    rollInstanceId: null,
+    index: null,
+  });
 
   useEffect(() => {
     if (showResult) {
@@ -478,15 +484,6 @@ export function DiceRollModal({
 
     canCloseRef.current = false;
   }, [showResult]);
-
-  useEffect(() => {
-    if (!result) {
-      setActiveRollIndex(0);
-      return;
-    }
-
-    setActiveRollIndex(result.selectedRollIndex ?? 0);
-  }, [result]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -507,7 +504,16 @@ export function DiceRollModal({
   }, [showResult, isRolling, onClose]);
 
   const displayedRollIndex = result
-    ? Math.min(Math.max(activeRollIndex, 0), result.rolls.length - 1)
+    ? Math.min(
+        Math.max(
+          activeRollSelection.rollInstanceId === result.rollInstanceId &&
+            activeRollSelection.index !== null
+            ? activeRollSelection.index
+            : (result.selectedRollIndex ?? 0),
+          0,
+        ),
+        result.rolls.length - 1,
+      )
     : 0;
   const rawDisplayedModifierBreakdown =
     result?.perRollModifierBreakdowns?.[displayedRollIndex] ??
@@ -777,7 +783,12 @@ export function DiceRollModal({
                   label={result.chipLabels?.[index]}
                   isSelected={displayedRollIndex === index}
                   tone={getRollChipTone(index)}
-                  onClick={() => setActiveRollIndex(index)}
+                  onClick={() =>
+                    setActiveRollSelection({
+                      rollInstanceId: result.rollInstanceId,
+                      index,
+                    })
+                  }
                 />
                 {renderCriticalInteraction(index)}
               </div>

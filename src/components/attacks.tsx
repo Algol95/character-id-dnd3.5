@@ -944,7 +944,7 @@ export function Attacks({
         value: character.baseAttackBonus,
       },
       {
-        label: isRangedTouch ? "Mod. Destreza" : "Mod. Fuerza",
+        label: isRangedTouch ? "DEX" : "STR",
         value: getCharacterAbilityModifier(
           character,
           ability,
