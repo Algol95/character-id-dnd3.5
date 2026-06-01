@@ -11,6 +11,8 @@ export interface DiceRollOptions {
   mode?: DiceRollMode;
   highlightOutcome?: boolean;
   presetRolls?: number[];
+  showAggregateTotal?: boolean;
+  aggregateTotalModifiers?: DiceModifier[];
   selectedRollIndex?: number;
   selectedRollIndexes?: number[];
   chipValues?: number[];
@@ -19,6 +21,7 @@ export interface DiceRollOptions {
   chipAttackIndexes?: number[];
   criticalThreatRangeStart?: number;
   actionId?: string;
+  perRollModifierBreakdowns?: DiceModifier[][];
 }
 
 export interface DiceRollResult {
@@ -26,11 +29,14 @@ export interface DiceRollResult {
   total: number;
   diceType: number;
   rolls: number[];
+  showAggregateTotal?: boolean;
+  aggregateTotalModifiers?: DiceModifier[];
   selectedRollIndexes?: number[];
   chipValues?: number[];
   chipLabels?: string[];
   chipTones?: Array<"default" | "critical" | "fumble">;
   chipAttackIndexes?: number[];
+  perRollModifierBreakdowns?: DiceModifier[][];
   criticalThreatRangeStart?: number;
   actionId?: string;
   rollInstanceId: number;
@@ -111,6 +117,10 @@ export function useDiceRoller() {
           total: roll + modifierTotal,
           diceType,
           rolls,
+          showAggregateTotal: options.showAggregateTotal ?? false,
+          aggregateTotalModifiers: options.aggregateTotalModifiers
+            ? [...options.aggregateTotalModifiers]
+            : undefined,
           selectedRollIndexes:
             options.selectedRollIndexes &&
             options.selectedRollIndexes.length > 0
@@ -119,6 +129,13 @@ export function useDiceRoller() {
           chipValues:
             options.chipValues && options.chipValues.length === rolls.length
               ? [...options.chipValues]
+              : undefined,
+          perRollModifierBreakdowns:
+            options.perRollModifierBreakdowns &&
+            options.perRollModifierBreakdowns.length === rolls.length
+              ? options.perRollModifierBreakdowns.map((breakdown) => [
+                  ...breakdown,
+                ])
               : undefined,
           chipLabels:
             options.chipLabels && options.chipLabels.length === rolls.length

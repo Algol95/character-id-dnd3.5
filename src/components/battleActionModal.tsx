@@ -27,6 +27,10 @@ import {
   EQUIPMENT_SLOT_LABELS,
   isEquippedWeaponCandidate,
 } from "@/lib/equipment-effects";
+import {
+  computeEquipmentBonuses,
+  type EquipmentBonuses,
+} from "@/lib/equipment-effects";
 
 interface BattleActionModalProps {
   character: CharacterData;
@@ -280,6 +284,7 @@ function getWeaponSnapshot(item: EquippedItem): BattleActionWeaponSnapshot {
 
 function resolveModifierSourceValue(
   character: CharacterData,
+  equipmentBonuses: EquipmentBonuses,
   modifier: BattleActionModifier,
 ): number {
   switch (modifier.source) {
@@ -288,19 +293,28 @@ function resolveModifierSourceValue(
     case "baseAttackBonus":
       return character.baseAttackBonus;
     case "initiative":
-      return character.initiative;
+      return character.initiative + equipmentBonuses.initiative;
     default:
-      return getCharacterAbilityModifier(character, modifier.source);
+      return getCharacterAbilityModifier(
+        character,
+        modifier.source,
+        equipmentBonuses.abilityBonuses[modifier.source],
+      );
   }
 }
 
 function resolveModifierPreviewValue(
   character: CharacterData,
+  equipmentBonuses: EquipmentBonuses,
   modifier: BattleActionModifier,
   diceCount: number,
   spellDamageGroups: SpellDamageGroup[] = [],
 ): number {
-  const baseValue = resolveModifierSourceValue(character, modifier);
+  const baseValue = resolveModifierSourceValue(
+    character,
+    equipmentBonuses,
+    modifier,
+  );
   const affectedDiceCount = getModifierAffectedDiceCount(
     modifier,
     diceCount,
@@ -312,6 +326,7 @@ function resolveModifierPreviewValue(
 
 function getModifierPreviewDescription(
   character: CharacterData,
+  equipmentBonuses: EquipmentBonuses,
   modifier: BattleActionModifier,
   diceCount: number,
   spellDamageGroups: SpellDamageGroup[] = [],
@@ -321,9 +336,14 @@ function getModifierPreviewDescription(
     diceCount,
     spellDamageGroups,
   );
-  const sourceValue = resolveModifierSourceValue(character, modifier);
+  const sourceValue = resolveModifierSourceValue(
+    character,
+    equipmentBonuses,
+    modifier,
+  );
   const previewValue = resolveModifierPreviewValue(
     character,
+    equipmentBonuses,
     modifier,
     diceCount,
     spellDamageGroups,
@@ -545,6 +565,7 @@ interface ModifierListEditorProps {
   title: string;
   description: string;
   character: CharacterData;
+  equipmentBonuses: EquipmentBonuses;
   modifiers: BattleActionModifier[];
   onChange: (modifiers: BattleActionModifier[]) => void;
   allowPerDie?: boolean;
@@ -557,6 +578,7 @@ function ModifierListEditor({
   title,
   description,
   character,
+  equipmentBonuses,
   modifiers,
   onChange,
   allowPerDie = false,
@@ -585,13 +607,14 @@ function ModifierListEditor({
           total +
           resolveModifierPreviewValue(
             character,
+            equipmentBonuses,
             modifier,
             diceCount,
             spellDamageGroups,
           ),
         0,
       ),
-    [character, diceCount, modifiers, spellDamageGroups],
+    [character, diceCount, equipmentBonuses, modifiers, spellDamageGroups],
   );
 
   const updateModifier = (
@@ -742,6 +765,7 @@ function ModifierListEditor({
                     Se aplicara como {MODIFIER_SOURCE_LABELS[modifier.source]}:{" "}
                     {getModifierPreviewDescription(
                       character,
+                      equipmentBonuses,
                       modifier,
                       diceCount,
                       spellDamageGroups,
@@ -801,6 +825,10 @@ export function BattleActionModal({
   onClose,
   onSave,
 }: BattleActionModalProps) {
+  const equipmentBonuses = useMemo(
+    () => computeEquipmentBonuses(character),
+    [character],
+  );
   const equippedWeapons = useMemo(
     () => character.equippedItems.filter(isEquippedWeaponCandidate),
     [character.equippedItems],
@@ -1621,6 +1649,7 @@ export function BattleActionModal({
                 title="Bonos al ataque"
                 description="Aqui puedes sumar atributos o ajustes adicionales al d20. El bono base de ataque del personaje se aplica automaticamente."
                 character={character}
+                equipmentBonuses={equipmentBonuses}
                 modifiers={currentWeaponConfig.attackModifiers}
                 onChange={(attackModifiers) =>
                   setWeaponConfig((currentConfig) => ({
@@ -1634,6 +1663,7 @@ export function BattleActionModal({
                 title="Bonos al dano"
                 description="Los modificadores se sumaran al dano base del arma seleccionada."
                 character={character}
+                equipmentBonuses={equipmentBonuses}
                 modifiers={currentWeaponConfig.damageModifiers}
                 allowPerDie
                 diceCount={effectiveWeaponDiceCount}
@@ -1652,6 +1682,7 @@ export function BattleActionModal({
               title="Bufos o ajustes del hechizo"
               description="Añade bonos manuales o atributos que deban sumarse al efecto del conjuro."
               character={character}
+              equipmentBonuses={equipmentBonuses}
               modifiers={currentSpellConfig.effectModifiers}
               allowPerDie
               diceCount={currentSpellTotalDiceCount}

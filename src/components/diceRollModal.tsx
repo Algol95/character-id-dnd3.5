@@ -45,6 +45,7 @@ interface RollChipProps {
   label?: string;
   isSelected: boolean;
   tone?: "default" | "critical" | "fumble";
+  onClick?: () => void;
 }
 
 interface CriticalConfirmationState {
@@ -94,6 +95,32 @@ function hasCriticalThreat(result: DiceRollResult | null) {
     result.roll >= result.criticalThreatRangeStart &&
     result.roll < 20,
   );
+}
+
+function removeAggregateModifiers(
+  modifiers: DiceRollResult["modifierBreakdown"],
+  aggregateModifiers: DiceRollResult["aggregateTotalModifiers"],
+) {
+  if (!aggregateModifiers || aggregateModifiers.length === 0) {
+    return modifiers;
+  }
+
+  const remainingAggregateModifiers = [...aggregateModifiers];
+
+  return modifiers.filter((modifier) => {
+    const matchedIndex = remainingAggregateModifiers.findIndex(
+      (aggregateModifier) =>
+        aggregateModifier.label === modifier.label &&
+        aggregateModifier.value === modifier.value,
+    );
+
+    if (matchedIndex === -1) {
+      return true;
+    }
+
+    remainingAggregateModifiers.splice(matchedIndex, 1);
+    return false;
+  });
 }
 
 function getResultAppearance(result: DiceRollResult | null): ResultAppearance {
@@ -169,6 +196,7 @@ function RollChip({
   label,
   isSelected,
   tone = "default",
+  onClick,
 }: RollChipProps) {
   const toneClasses =
     tone === "critical"
@@ -187,8 +215,10 @@ function RollChip({
         : "text-gold-dim/80";
 
   return (
-    <div
-      className={`min-w-16 rounded-xl border px-3 py-2 text-center transition-colors ${toneClasses}`}
+    <button
+      type="button"
+      onClick={onClick}
+      className={`min-w-16 rounded-xl border px-3 py-2 text-center transition-colors ${toneClasses} ${onClick ? "cursor-pointer hover:border-gold/80" : "cursor-default"}`}
     >
       {label ? (
         <div className="text-[10px] uppercase tracking-[0.16em] text-gold-dim/85">
@@ -203,7 +233,7 @@ function RollChip({
         </div>
       ) : null}
       <div className="mt-1 text-2xl font-bold">{value}</div>
-    </div>
+    </button>
   );
 }
 
@@ -435,6 +465,7 @@ export function DiceRollModal({
       key: "",
       decisions: {},
     });
+  const [activeRollIndex, setActiveRollIndex] = useState(0);
 
   useEffect(() => {
     if (showResult) {
@@ -447,6 +478,15 @@ export function DiceRollModal({
 
     canCloseRef.current = false;
   }, [showResult]);
+
+  useEffect(() => {
+    if (!result) {
+      setActiveRollIndex(0);
+      return;
+    }
+
+    setActiveRollIndex(result.selectedRollIndex ?? 0);
+  }, [result]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -466,7 +506,48 @@ export function DiceRollModal({
     };
   }, [showResult, isRolling, onClose]);
 
-  const appearance = getResultAppearance(result);
+  const displayedRollIndex = result
+    ? Math.min(Math.max(activeRollIndex, 0), result.rolls.length - 1)
+    : 0;
+  const rawDisplayedModifierBreakdown =
+    result?.perRollModifierBreakdowns?.[displayedRollIndex] ??
+    result?.modifierBreakdown ??
+    [];
+  const displayedModifierBreakdown = result?.showAggregateTotal
+    ? removeAggregateModifiers(
+        rawDisplayedModifierBreakdown,
+        result.aggregateTotalModifiers,
+      )
+    : rawDisplayedModifierBreakdown;
+  const displayedRoll = result?.rolls[displayedRollIndex] ?? 0;
+  const displayedModifierTotal = displayedModifierBreakdown.reduce(
+    (sum, modifier) => sum + modifier.value,
+    0,
+  );
+  const aggregateTotalModifiers = result?.aggregateTotalModifiers ?? [];
+  const aggregateTotalModifierSum = aggregateTotalModifiers.reduce(
+    (sum, modifier) => sum + modifier.value,
+    0,
+  );
+  const selectedRollTotal =
+    result?.chipValues?.[displayedRollIndex] ??
+    displayedRoll + displayedModifierTotal;
+  const displayedTotal = result?.showAggregateTotal
+    ? result.total
+    : selectedRollTotal;
+  const aggregateSubtotal = result?.showAggregateTotal
+    ? displayedTotal - aggregateTotalModifierSum
+    : displayedTotal;
+  const displayedResult = result
+    ? {
+        ...result,
+        roll: displayedRoll,
+        total: selectedRollTotal,
+        selectedRollIndex: displayedRollIndex,
+        modifierBreakdown: displayedModifierBreakdown,
+      }
+    : null;
+  const appearance = getResultAppearance(displayedResult);
   const hasMultipleRolls = (result?.rolls.length ?? 0) > 1;
   const criticalConfirmationSessionKey = `${rollLabel}:${result?.diceType ?? 0}:${result?.selectedRollIndex ?? 0}:${result?.criticalThreatRangeStart ?? "none"}:${result?.rollInstanceId ?? 0}:${result?.rolls.join(",") ?? ""}`;
   const confirmationDecisions =
@@ -491,7 +572,7 @@ export function DiceRollModal({
         }, [])
       : [];
   const showOutcomeMessage =
-    hasCriticalOutcome(result) || hasFumbleOutcome(result);
+    hasCriticalOutcome(displayedResult) || hasFumbleOutcome(displayedResult);
   const selectedRollIndexes =
     result?.selectedRollIndexes && result.selectedRollIndexes.length > 0
       ? result.selectedRollIndexes
@@ -663,8 +744,8 @@ export function DiceRollModal({
         <div className="relative w-40 h-40 md:w-52 md:h-52 flex items-center justify-center">
           <div className={`relative ${isRolling ? "animate-dice-roll" : ""}`}>
             <DiceShape
-              diceType={result?.diceType || 20}
-              roll={result?.roll}
+              diceType={displayedResult?.diceType || result?.diceType || 20}
+              roll={displayedResult?.roll}
               isRolling={isRolling}
               colorClass={appearance.diceColorClass}
             />
@@ -694,8 +775,9 @@ export function DiceRollModal({
                       : undefined
                   }
                   label={result.chipLabels?.[index]}
-                  isSelected={isSelectedRoll(index)}
+                  isSelected={displayedRollIndex === index}
                   tone={getRollChipTone(index)}
+                  onClick={() => setActiveRollIndex(index)}
                 />
                 {renderCriticalInteraction(index)}
               </div>
@@ -719,9 +801,9 @@ export function DiceRollModal({
           <div className="flex flex-col items-center gap-4 animate-result-slam">
             <div className="flex flex-wrap items-center justify-center gap-2 text-lg md:text-xl">
               <span className={`font-bold ${appearance.diceColorClass}`}>
-                {result.roll}
+                {displayedRoll}
               </span>
-              {result.modifierBreakdown.map((mod, index) => (
+              {displayedModifierBreakdown.map((mod, index) => (
                 <span
                   key={index}
                   className="text-muted-foreground animate-modifier-appear"
@@ -742,14 +824,40 @@ export function DiceRollModal({
               ))}
             </div>
 
-            <div className="flex items-center gap-3">
-              <span className="text-muted-foreground text-xl">=</span>
-              <span
-                className={`text-5xl md:text-7xl font-bold ${appearance.diceColorClass}`}
-              >
-                {result.total}
-              </span>
-            </div>
+            {result?.showAggregateTotal &&
+            aggregateTotalModifiers.length > 0 ? (
+              <div className="flex flex-wrap items-center justify-center gap-3 text-3xl md:text-5xl font-bold">
+                <span className={appearance.diceColorClass}>
+                  {aggregateSubtotal}
+                </span>
+                {aggregateTotalModifiers.map((modifier, index) => (
+                  <span
+                    key={`${modifier.label}-${modifier.value}-${index}`}
+                    className={
+                      modifier.value >= 0 ? "text-success" : "text-blood-red"
+                    }
+                  >
+                    {modifier.value >= 0 ? "+" : ""}
+                    {modifier.value}
+                  </span>
+                ))}
+                <span className="text-muted-foreground text-xl md:text-3xl">
+                  =
+                </span>
+                <span className={appearance.diceColorClass}>
+                  {displayedTotal}
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3">
+                <span className="text-muted-foreground text-xl">=</span>
+                <span
+                  className={`text-5xl md:text-7xl font-bold ${appearance.diceColorClass}`}
+                >
+                  {displayedTotal}
+                </span>
+              </div>
+            )}
           </div>
         )}
 

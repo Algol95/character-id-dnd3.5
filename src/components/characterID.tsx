@@ -21,7 +21,6 @@ import { Header } from "./header";
 import { Footer } from "./footer";
 import {
   DEFAULT_CHARACTER,
-  formatModifier,
   getSpellDamageGroups,
   type Attack,
   type CharacterData,
@@ -507,6 +506,9 @@ export function CharacterId() {
         (sum, modifier) => sum + modifier.value,
         0,
       );
+      const baseAttackModifierIndex = modifiers.findIndex((modifier) =>
+        /^(BBA|Bono base de ataque)$/i.test(modifier.label),
+      );
       const resolvedAttackBonusTotals =
         attackBonusTotals && attackBonusTotals.length === diceCount
           ? attackBonusTotals
@@ -537,6 +539,29 @@ export function CharacterId() {
                 : rightIndex;
           })
         : [0];
+      const perRollModifierBreakdowns = attackRolls.map((_, index) => {
+        const attackIndex = shouldPairRolls ? Math.floor(index / 2) : index;
+        const resolvedAttackBonusTotal =
+          resolvedAttackBonusTotals[attackIndex] ?? modifierTotal;
+        const adjustment = resolvedAttackBonusTotal - modifierTotal;
+
+        if (adjustment === 0) {
+          return modifiers.map((modifier) => ({ ...modifier }));
+        }
+
+        if (baseAttackModifierIndex >= 0) {
+          return modifiers.map((modifier, modifierIndex) =>
+            modifierIndex === baseAttackModifierIndex
+              ? { ...modifier, value: modifier.value + adjustment }
+              : { ...modifier },
+          );
+        }
+
+        return [
+          ...modifiers.map((modifier) => ({ ...modifier })),
+          { label: "Ajuste por ataque", value: adjustment },
+        ];
+      });
       const labelDetails = [
         diceCount > 1 ? `${diceCount} ataques` : null,
         mode === "advantage"
@@ -554,6 +579,7 @@ export function CharacterId() {
       rollDice(20, modifiers, {
         highlightOutcome: criticalThreatRangeStart === undefined,
         presetRolls: attackRolls,
+        perRollModifierBreakdowns,
         chipValues: attackRolls.map((roll, index) => {
           const attackIndex = shouldPairRolls ? Math.floor(index / 2) : index;
 
@@ -662,12 +688,15 @@ export function CharacterId() {
         diceType: number;
         totalBonus: number;
         perDieBonus: number;
+        totalModifiers?: RollModifier[];
+        perDieModifiers?: RollModifier[];
         baseMultiplier?: number;
         damageGroups?: {
           diceCount: number;
           diceType?: number;
           damageType?: string;
           perDieBonus?: number;
+          perDieModifiers?: RollModifier[];
           baseMultiplier?: number;
         }[];
       },
@@ -677,17 +706,42 @@ export function CharacterId() {
         diceType,
         totalBonus,
         perDieBonus,
+        totalModifiers = [],
+        perDieModifiers = [],
         baseMultiplier = 1,
         damageGroups,
       } = damageConfig;
+      const resolvedTotalModifiers =
+        totalModifiers.length > 0
+          ? totalModifiers
+          : totalBonus !== 0
+            ? [{ label: "Bono", value: totalBonus }]
+            : [];
+      const resolvedPerDieModifiers =
+        perDieModifiers.length > 0
+          ? perDieModifiers
+          : perDieBonus !== 0
+            ? [{ label: "Bono/dado", value: perDieBonus }]
+            : [];
 
       const resolvedDamageGroups =
         damageGroups && damageGroups.length > 0
-          ? damageGroups.map((group) => ({
+          ? damageGroups.map((group, groupIndex) => ({
               diceCount: Math.max(1, group.diceCount),
               diceType: group.diceType ?? diceType,
               damageType: group.damageType,
               perDieBonus: group.perDieBonus ?? 0,
+              perDieModifiers:
+                group.perDieModifiers && group.perDieModifiers.length > 0
+                  ? group.perDieModifiers
+                  : (group.perDieBonus ?? 0) !== 0
+                    ? [
+                        {
+                          label: `Bono/dado G${groupIndex + 1}`,
+                          value: group.perDieBonus ?? 0,
+                        },
+                      ]
+                    : [],
               baseMultiplier: Math.max(1, group.baseMultiplier ?? 1),
             }))
           : [
@@ -696,6 +750,7 @@ export function CharacterId() {
                 diceType,
                 damageType: undefined,
                 perDieBonus: 0,
+                perDieModifiers: [],
                 baseMultiplier: Math.max(1, baseMultiplier),
               },
             ];
@@ -707,11 +762,11 @@ export function CharacterId() {
         ),
       );
       const baseRolls = groupedBaseRolls.flat();
-      const selectedRollIndex = 0;
+      const initialSelectedRollIndex = 0;
       const baseDiceCount = baseRolls.length;
       const remainingBaseRolls =
         baseRolls.reduce((sum, roll) => sum + roll, 0) -
-        (baseRolls[selectedRollIndex] ?? 0);
+        (baseRolls[initialSelectedRollIndex] ?? 0);
       const criticalExtra = resolvedDamageGroups.reduce(
         (extraTotal, group, index) => {
           if (group.baseMultiplier <= 1) {
@@ -730,6 +785,26 @@ export function CharacterId() {
       const criticalGroups = resolvedDamageGroups.filter(
         (group) => group.baseMultiplier > 1,
       );
+      const flatRollDetails = groupedBaseRolls.flatMap(
+        (groupRolls, groupIndex) => {
+          const resolvedGroup = resolvedDamageGroups[groupIndex];
+          const groupPerDieBonus = resolvedGroup?.perDieBonus ?? 0;
+          const groupPerDieModifiers = resolvedGroup?.perDieModifiers ?? [];
+          const groupMultiplier = Math.max(
+            1,
+            resolvedGroup?.baseMultiplier ?? 1,
+          );
+
+          return groupRolls.map((roll) => ({
+            roll,
+            diceType: resolvedGroup?.diceType ?? diceType,
+            groupIndex,
+            groupPerDieBonus,
+            groupPerDieModifiers,
+            groupMultiplier,
+          }));
+        },
+      );
       const chipMetadata = groupedBaseRolls.flatMap(
         (groupRolls, groupIndex) => {
           const groupPerDieBonus =
@@ -742,11 +817,7 @@ export function CharacterId() {
           const chipLabel = `d${resolvedDamageGroups[groupIndex]?.diceType ?? diceType}`;
 
           return groupRolls.map((roll) => ({
-            value:
-              roll * groupMultiplier +
-              perDieBonus +
-              groupPerDieBonus +
-              totalBonus,
+            value: roll * groupMultiplier + perDieBonus + groupPerDieBonus,
             label: chipLabel,
             tone: isCriticalGroup
               ? ("critical" as const)
@@ -754,13 +825,16 @@ export function CharacterId() {
           }));
         },
       );
-      const perDieExtra = perDieBonus * baseDiceCount;
-      const groupPerDieModifiers = resolvedDamageGroups
-        .map((group, groupIndex) => ({
-          value: (group.perDieBonus ?? 0) * group.diceCount,
-          label: `${formatModifier(group.perDieBonus ?? 0)} por dado en grupo ${groupIndex + 1} (${group.diceCount}d${group.diceType})`,
-        }))
-        .filter((modifier) => modifier.value !== 0);
+      const perDieModifierTotals = resolvedPerDieModifiers.map((modifier) => ({
+        label: modifier.label,
+        value: modifier.value * baseDiceCount,
+      }));
+      const groupPerDieModifierTotals = resolvedDamageGroups.flatMap((group) =>
+        (group.perDieModifiers ?? []).map((modifier) => ({
+          label: modifier.label,
+          value: modifier.value * group.diceCount,
+        })),
+      );
       const expression = resolvedDamageGroups
         .map((group) => `${group.diceCount}d${group.diceType}`)
         .join(" + ");
@@ -796,27 +870,36 @@ export function CharacterId() {
         ...(criticalExtra !== 0
           ? [{ label: criticalLabel, value: criticalExtra }]
           : []),
-        ...(perDieExtra !== 0
-          ? [
-              {
-                label: `${formatModifier(perDieBonus)} por dado`,
-                value: perDieExtra,
-              },
-            ]
-          : []),
-        ...groupPerDieModifiers,
-        ...(totalBonus !== 0
-          ? [{ label: "Bono total", value: totalBonus }]
-          : []),
+        ...perDieModifierTotals,
+        ...groupPerDieModifierTotals,
+        ...resolvedTotalModifiers,
       ];
+      const perRollModifierBreakdowns = flatRollDetails.map((rollDetail) => {
+        return [
+          ...(rollDetail.groupMultiplier > 1
+            ? [
+                {
+                  label: `Critico x${rollDetail.groupMultiplier}`,
+                  value: rollDetail.roll * (rollDetail.groupMultiplier - 1),
+                },
+              ]
+            : []),
+          ...resolvedPerDieModifiers,
+          ...rollDetail.groupPerDieModifiers,
+          ...resolvedTotalModifiers,
+        ];
+      });
 
       rollDice(diceType, modifiers, {
         highlightOutcome: false,
         presetRolls: baseRolls,
+        showAggregateTotal: true,
+        aggregateTotalModifiers: resolvedTotalModifiers,
+        perRollModifierBreakdowns,
         chipValues:
           perDieBonus !== 0 ||
-          totalBonus !== 0 ||
-          groupPerDieModifiers.length > 0 ||
+          resolvedPerDieModifiers.length > 0 ||
+          groupPerDieModifierTotals.length > 0 ||
           hasCriticalGroups
             ? chipMetadata.map((chip) => chip.value)
             : undefined,
@@ -824,7 +907,7 @@ export function CharacterId() {
         chipTones: hasCriticalGroups
           ? chipMetadata.map((chip) => chip.tone)
           : undefined,
-        selectedRollIndex,
+        selectedRollIndex: initialSelectedRollIndex,
       });
     },
     [rollDice],

@@ -16,6 +16,7 @@ import {
   type BattleActionModifier,
   type CharacterData,
 } from "@/lib/character-types";
+import { computeEquipmentBonuses } from "@/lib/equipment-effects";
 import { isEquippedWeaponCandidate } from "@/lib/equipment-effects";
 
 /**
@@ -40,12 +41,15 @@ interface AttacksProps {
       diceType: number;
       totalBonus: number;
       perDieBonus: number;
+      totalModifiers?: { label: string; value: number }[];
+      perDieModifiers?: { label: string; value: number }[];
       baseMultiplier?: number;
       damageGroups?: {
         diceCount: number;
         diceType?: number;
         damageType?: string;
         perDieBonus?: number;
+        perDieModifiers?: { label: string; value: number }[];
         baseMultiplier?: number;
       }[];
     },
@@ -55,6 +59,20 @@ interface AttacksProps {
   isOpen?: boolean;
   onToggle?: () => void;
 }
+
+const MODIFIER_SOURCE_SHORT_LABELS: Record<
+  Exclude<BattleActionModifier["source"], "custom">,
+  string
+> = {
+  baseAttackBonus: "BBA",
+  initiative: "INI",
+  strength: "STR",
+  dexterity: "DEX",
+  constitution: "CON",
+  intelligence: "INT",
+  wisdom: "WIS",
+  charisma: "CHA",
+};
 
 function MacroActionButton({
   onClick,
@@ -447,6 +465,10 @@ export function Attacks({
   isOpen,
   onToggle,
 }: AttacksProps) {
+  const equipmentBonuses = useMemo(
+    () => computeEquipmentBonuses(character),
+    [character],
+  );
   const [editingActionId, setEditingActionId] = useState<string | "new" | null>(
     null,
   );
@@ -488,7 +510,7 @@ export function Attacks({
       case "initiative":
         return {
           label: "Iniciativa",
-          value: character.initiative,
+          value: character.initiative + equipmentBonuses.initiative,
           application,
           spellDamageGroupId: modifier.spellDamageGroupId,
         };
@@ -500,7 +522,11 @@ export function Attacks({
       case "charisma":
         return {
           label: `Mod. ${modifier.source}`,
-          value: getCharacterAbilityModifier(character, modifier.source),
+          value: getCharacterAbilityModifier(
+            character,
+            modifier.source,
+            equipmentBonuses.abilityBonuses[modifier.source],
+          ),
           application,
           spellDamageGroupId: modifier.spellDamageGroupId,
         };
@@ -651,6 +677,97 @@ export function Attacks({
       { total: 0, perDie: 0, perGroup: {} as Record<string, number> },
     );
 
+  const getModifierRollLabel = (
+    modifier: BattleActionModifier,
+    application: BattleActionModifierApplication,
+    groupIndex?: number,
+  ) => {
+    const baseLabel =
+      modifier.source === "custom"
+        ? modifier.customLabel?.trim() || "Ajuste"
+        : MODIFIER_SOURCE_SHORT_LABELS[modifier.source];
+
+    if (application === "perDie") {
+      return `${baseLabel}/dado`;
+    }
+
+    if (application === "perGroup") {
+      return groupIndex === undefined
+        ? `${baseLabel}/dado`
+        : `${baseLabel}/dado G${groupIndex + 1}`;
+    }
+
+    return baseLabel;
+  };
+
+  const getResolvedDamageModifierDetails = (
+    modifiers: BattleActionModifier[],
+    spellDamageGroups: ReturnType<typeof getSpellDamageGroups> = [],
+  ) =>
+    modifiers.reduce(
+      (accumulator, modifier) => {
+        const resolvedModifier = resolveModifier(modifier);
+
+        if (resolvedModifier.application === "perGroup") {
+          if (spellDamageGroups.length <= 1) {
+            accumulator.perDie.push({
+              label: getModifierRollLabel(modifier, "perDie"),
+              value: resolvedModifier.value,
+            });
+            return accumulator;
+          }
+
+          const fallbackGroupId = spellDamageGroups[0]?.id;
+          const targetGroupId = spellDamageGroups.some(
+            (group) => group.id === resolvedModifier.spellDamageGroupId,
+          )
+            ? resolvedModifier.spellDamageGroupId
+            : fallbackGroupId;
+
+          if (!targetGroupId) {
+            return accumulator;
+          }
+
+          const targetGroupIndex = spellDamageGroups.findIndex(
+            (group) => group.id === targetGroupId,
+          );
+
+          accumulator.perGroup[targetGroupId] = [
+            ...(accumulator.perGroup[targetGroupId] ?? []),
+            {
+              label: getModifierRollLabel(
+                modifier,
+                "perGroup",
+                targetGroupIndex >= 0 ? targetGroupIndex : undefined,
+              ),
+              value: resolvedModifier.value,
+            },
+          ];
+
+          return accumulator;
+        }
+
+        if (resolvedModifier.application === "perDie") {
+          accumulator.perDie.push({
+            label: getModifierRollLabel(modifier, "perDie"),
+            value: resolvedModifier.value,
+          });
+        } else {
+          accumulator.total.push({
+            label: getModifierRollLabel(modifier, "total"),
+            value: resolvedModifier.value,
+          });
+        }
+
+        return accumulator;
+      },
+      {
+        total: [] as Array<{ label: string; value: number }>,
+        perDie: [] as Array<{ label: string; value: number }>,
+        perGroup: {} as Record<string, Array<{ label: string; value: number }>>,
+      },
+    );
+
   const formatModifierSummary = (
     totalBonus: number,
     perDieBonus: number,
@@ -731,6 +848,9 @@ export function Attacks({
     criticalAttackIndexes: number[] = [],
   ) => {
     const snapshot = resolveWeaponSnapshot(attack);
+    const damageModifierDetails = getResolvedDamageModifierDetails(
+      attack.weaponConfig?.damageModifiers ?? [],
+    );
     const damageBonuses = summarizeModifiers(
       attack.weaponConfig?.damageModifiers ?? [],
     );
@@ -743,6 +863,8 @@ export function Attacks({
       diceType: snapshot?.damageDiceType ?? 6,
       totalBonus: damageBonuses.total,
       perDieBonus: damageBonuses.perDie,
+      totalModifiers: damageModifierDetails.total,
+      perDieModifiers: damageModifierDetails.perDie,
       damageGroups: Array.from(
         { length: weaponAttackCount },
         (_, attackIndex) => ({
@@ -788,6 +910,10 @@ export function Attacks({
   const getSpellDamageConfig = (attack: Attack) => {
     const spellConfig = attack.spellConfig;
     const damageGroups = getSpellDamageGroups(spellConfig);
+    const modifierDetails = getResolvedDamageModifierDetails(
+      attack.spellConfig?.effectModifiers ?? [],
+      damageGroups,
+    );
     const modifierBonuses = summarizeModifiers(
       attack.spellConfig?.effectModifiers ?? [],
       damageGroups,
@@ -798,9 +924,12 @@ export function Attacks({
       diceType: damageGroups[0]?.diceType ?? 6,
       totalBonus: modifierBonuses.total,
       perDieBonus: modifierBonuses.perDie,
+      totalModifiers: modifierDetails.total,
+      perDieModifiers: modifierDetails.perDie,
       damageGroups: damageGroups.map((group) => ({
         ...group,
         perDieBonus: modifierBonuses.perGroup[group.id ?? ""] ?? 0,
+        perDieModifiers: modifierDetails.perGroup[group.id ?? ""] ?? [],
       })),
     };
   };
@@ -816,7 +945,11 @@ export function Attacks({
       },
       {
         label: isRangedTouch ? "Mod. Destreza" : "Mod. Fuerza",
-        value: getCharacterAbilityModifier(character, ability),
+        value: getCharacterAbilityModifier(
+          character,
+          ability,
+          equipmentBonuses.abilityBonuses[ability],
+        ),
       },
     ];
   };
