@@ -33,6 +33,7 @@ interface MenuPosition {
   left: number;
   width: number;
   maxHeight: number;
+  direction: "up" | "down";
 }
 
 const MIN_MENU_WIDTH = 220;
@@ -106,6 +107,7 @@ export function FormSelect({
         left,
         width: desiredWidth,
         maxHeight,
+        direction: shouldOpenUpward ? "up" : "down",
       });
     };
 
@@ -142,6 +144,37 @@ export function FormSelect({
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || !menuPosition || menuPosition.direction !== "up") {
+      return;
+    }
+
+    const triggerRect = triggerRef.current?.getBoundingClientRect();
+    const renderedMenuHeight = menuRef.current?.offsetHeight;
+
+    if (!triggerRect || !renderedMenuHeight) {
+      return;
+    }
+
+    const adjustedTop = Math.max(
+      MENU_VIEWPORT_MARGIN,
+      triggerRect.top - renderedMenuHeight - MENU_OFFSET,
+    );
+
+    if (Math.abs(adjustedTop - menuPosition.top) < 1) {
+      return;
+    }
+
+    setMenuPosition((currentPosition) =>
+      currentPosition && currentPosition.direction === "up"
+        ? {
+            ...currentPosition,
+            top: adjustedTop,
+          }
+        : currentPosition,
+    );
+  }, [isOpen, menuPosition]);
 
   const textToneClass = selectedOption
     ? "text-foreground"
