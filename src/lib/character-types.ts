@@ -332,6 +332,7 @@ export interface CharacterData {
   equipment: InventoryItem[];
   carryingCapacity: CarryingCapacity;
   feats: string;
+  languages: string;
   specialAbilities: string;
   notes: string;
 }
@@ -621,6 +622,7 @@ export const DEFAULT_CHARACTER: CharacterData = {
     pushOrDrag: 0,
   },
   feats: "",
+  languages: "",
   specialAbilities: "",
   notes: "",
 };

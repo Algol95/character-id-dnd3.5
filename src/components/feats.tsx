@@ -77,6 +77,16 @@ export function Feats({
           ) : null}
         </div>
 
+        <div>
+          <div className="text-xs text-muted-foreground mb-2">Idiomas</div>
+          <textarea
+            value={character.languages}
+            onChange={(e) => onChange({ languages: e.target.value })}
+            className="w-full h-24 rounded bg-input border border-border px-3 py-2 text-sm resize-none"
+            placeholder="Escribe aqui los idiomas que conoce el personaje...&#10;&#10;- Comun&#10;- Elfico&#10;- Enano"
+          />
+        </div>
+
         {/* Notes */}
         <div>
           <div className="text-xs text-muted-foreground mb-2">Notas</div>
