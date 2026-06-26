@@ -13,6 +13,22 @@ export interface Money {
   copper: number;
 }
 
+export interface InventoryItem {
+  id: string;
+  name: string;
+  quantity: number;
+  weight: number;
+}
+
+export interface CarryingCapacity {
+  lightLoad: number;
+  mediumLoad: number;
+  heavyLoad: number;
+  liftOverHead: number;
+  liftOffGround: number;
+  pushOrDrag: number;
+}
+
 export type AbilityScoreField =
   | "strength"
   | "dexterity"
@@ -313,7 +329,8 @@ export interface CharacterData {
   maxSkillRank: number;
   equippedItems: EquippedItem[];
   money: Money;
-  equipment: string;
+  equipment: InventoryItem[];
+  carryingCapacity: CarryingCapacity;
   feats: string;
   specialAbilities: string;
   notes: string;
@@ -594,7 +611,15 @@ export const DEFAULT_CHARACTER: CharacterData = {
     silver: 0,
     copper: 0,
   },
-  equipment: "",
+  equipment: [],
+  carryingCapacity: {
+    lightLoad: 0,
+    mediumLoad: 0,
+    heavyLoad: 0,
+    liftOverHead: 0,
+    liftOffGround: 0,
+    pushOrDrag: 0,
+  },
   feats: "",
   specialAbilities: "",
   notes: "",

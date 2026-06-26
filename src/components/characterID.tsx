@@ -21,10 +21,12 @@ import { Header } from "./header";
 import { Footer } from "./footer";
 import {
   DEFAULT_CHARACTER,
+  type CarryingCapacity,
   getSpellDamageGroups,
   type Attack,
   type CharacterData,
   type EquippedItem,
+  type InventoryItem,
   type WeaponProfile,
 } from "@/lib/character-types";
 import { computeEquipmentBonuses } from "@/lib/equipment-effects";
@@ -74,6 +76,8 @@ interface PanelSectionProps {
 }
 
 type StoredEquippedItem = EquippedItem & Partial<WeaponProfile>;
+type StoredInventoryItem = Partial<InventoryItem>;
+type StoredCarryingCapacity = Partial<CarryingCapacity>;
 
 const OFFICIAL_DAMAGE_DICE_TYPES = new Set([4, 6, 8, 10, 12]);
 
@@ -142,6 +146,84 @@ function createBattleActionId(prefix = "battle") {
   }
 
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function normalizeStoredInventory(
+  equipment: CharacterData["equipment"] | StoredInventoryItem[] | string | null,
+): InventoryItem[] {
+  if (typeof equipment === "string") {
+    return equipment
+      .split(/\r?\n/)
+      .map((line) => line.replace(/^\s*[-*•]\s*/, "").trim())
+      .filter(Boolean)
+      .map((name) => ({
+        id: createBattleActionId("inventory"),
+        name,
+        quantity: 1,
+        weight: 0,
+      }));
+  }
+
+  if (!Array.isArray(equipment)) {
+    return [];
+  }
+
+  return equipment.map((item) => ({
+    id:
+      typeof item.id === "string" && item.id.trim().length > 0
+        ? item.id
+        : createBattleActionId("inventory"),
+    name: typeof item.name === "string" ? item.name : "",
+    quantity:
+      typeof item.quantity === "number" && Number.isFinite(item.quantity)
+        ? Math.max(0, Math.trunc(item.quantity))
+        : 1,
+    weight:
+      typeof item.weight === "number" && Number.isFinite(item.weight)
+        ? Math.max(0, item.weight)
+        : 0,
+  }));
+}
+
+function normalizeStoredCarryingCapacity(
+  carryingCapacity:
+    | CharacterData["carryingCapacity"]
+    | StoredCarryingCapacity
+    | null
+    | undefined,
+): CarryingCapacity {
+  return {
+    lightLoad:
+      typeof carryingCapacity?.lightLoad === "number" &&
+      Number.isFinite(carryingCapacity.lightLoad)
+        ? Math.max(0, Math.trunc(carryingCapacity.lightLoad))
+        : DEFAULT_CHARACTER.carryingCapacity.lightLoad,
+    mediumLoad:
+      typeof carryingCapacity?.mediumLoad === "number" &&
+      Number.isFinite(carryingCapacity.mediumLoad)
+        ? Math.max(0, Math.trunc(carryingCapacity.mediumLoad))
+        : DEFAULT_CHARACTER.carryingCapacity.mediumLoad,
+    heavyLoad:
+      typeof carryingCapacity?.heavyLoad === "number" &&
+      Number.isFinite(carryingCapacity.heavyLoad)
+        ? Math.max(0, Math.trunc(carryingCapacity.heavyLoad))
+        : DEFAULT_CHARACTER.carryingCapacity.heavyLoad,
+    liftOverHead:
+      typeof carryingCapacity?.liftOverHead === "number" &&
+      Number.isFinite(carryingCapacity.liftOverHead)
+        ? Math.max(0, Math.trunc(carryingCapacity.liftOverHead))
+        : DEFAULT_CHARACTER.carryingCapacity.liftOverHead,
+    liftOffGround:
+      typeof carryingCapacity?.liftOffGround === "number" &&
+      Number.isFinite(carryingCapacity.liftOffGround)
+        ? Math.max(0, Math.trunc(carryingCapacity.liftOffGround))
+        : DEFAULT_CHARACTER.carryingCapacity.liftOffGround,
+    pushOrDrag:
+      typeof carryingCapacity?.pushOrDrag === "number" &&
+      Number.isFinite(carryingCapacity.pushOrDrag)
+        ? Math.max(0, Math.trunc(carryingCapacity.pushOrDrag))
+        : DEFAULT_CHARACTER.carryingCapacity.pushOrDrag,
+  };
 }
 
 function parseLegacyCritical(critical?: string) {
@@ -352,6 +434,12 @@ function sanitizeCharacterData(character: CharacterData): CharacterData {
     equippedItems: character.equippedItems
       .filter((item) => item.slot !== "ammunition")
       .map((item) => normalizeStoredEquippedItem(item as StoredEquippedItem)),
+    equipment: normalizeStoredInventory(
+      character.equipment as CharacterData["equipment"] | string,
+    ),
+    carryingCapacity: normalizeStoredCarryingCapacity(
+      character.carryingCapacity,
+    ),
   };
 }
 /**
@@ -1011,13 +1099,6 @@ export function CharacterId() {
                   onToggle={() => toggleSection("equippedGear")}
                 />
 
-                <Equipment
-                  character={character}
-                  onChange={handleChange}
-                  isOpen={visibleSections.equipment}
-                  onToggle={() => toggleSection("equipment")}
-                />
-
                 <Attacks
                   character={character}
                   onChange={handleChange}
@@ -1032,7 +1113,7 @@ export function CharacterId() {
 
               <PanelSection
                 eyebrow="Apoyo de partida"
-                title="Tiradas, habilidades y dotes"
+                title="Tiradas, inventario, habilidades y dotes"
                 caption="Utilidades de sesion"
                 sticky
               >
@@ -1057,6 +1138,13 @@ export function CharacterId() {
                   onChange={handleChange}
                   isOpen={visibleSections.feats}
                   onToggle={() => toggleSection("feats")}
+                />
+
+                <Equipment
+                  character={character}
+                  onChange={handleChange}
+                  isOpen={visibleSections.equipment}
+                  onToggle={() => toggleSection("equipment")}
                 />
               </PanelSection>
             </div>
