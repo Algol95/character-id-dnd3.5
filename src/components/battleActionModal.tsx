@@ -224,6 +224,8 @@ function cloneAction(action: Attack): Attack {
           isFullAttack: Boolean(action.weaponConfig.isFullAttack),
           useCustomWeaponProfile:
             action.weaponConfig.useCustomWeaponProfile ?? false,
+          disableTwoHandedDamageMultiplier:
+            action.weaponConfig.disableTwoHandedDamageMultiplier ?? false,
           extraDamageDiceCount: action.weaponConfig.extraDamageDiceCount ?? 0,
           weaponSnapshot: { ...action.weaponConfig.weaponSnapshot },
           attackModifiers:
@@ -418,6 +420,7 @@ function createEmptyAction(firstWeapon: EquippedItem | null): Attack {
         damageType: undefined,
         isFullAttack: false,
         useCustomWeaponProfile: false,
+        disableTwoHandedDamageMultiplier: false,
         extraDamageDiceCount: 0,
         attackModifiers: [],
         damageModifiers: [],
@@ -436,6 +439,7 @@ function createEmptyAction(firstWeapon: EquippedItem | null): Attack {
       damageType: undefined,
       isFullAttack: false,
       useCustomWeaponProfile: false,
+      disableTwoHandedDamageMultiplier: false,
       extraDamageDiceCount: 0,
       attackModifiers: [],
       damageModifiers: [],
@@ -872,6 +876,9 @@ export function BattleActionModal({
   const equippedWeaponSnapshot = selectedEquippedWeapon
     ? getWeaponSnapshot(selectedEquippedWeapon)
     : null;
+  const selectedEquippedWeaponIsTwoHanded = Boolean(
+    selectedEquippedWeapon?.isTwoHanded,
+  );
   const currentWeaponSnapshot = currentWeaponConfig
     ? currentWeaponConfig.source === "equipped" &&
       !currentWeaponConfig.useCustomWeaponProfile
@@ -916,6 +923,7 @@ export function BattleActionModal({
           damageType: undefined,
           isFullAttack: false,
           useCustomWeaponProfile: false,
+          disableTwoHandedDamageMultiplier: false,
           extraDamageDiceCount: 0,
           attackModifiers: [],
           damageModifiers: [],
@@ -1089,6 +1097,10 @@ export function BattleActionModal({
           baseWeaponConfig.source === "equipped"
             ? Boolean(baseWeaponConfig.useCustomWeaponProfile)
             : false,
+        disableTwoHandedDamageMultiplier:
+          baseWeaponConfig.source === "equipped" && equippedWeapon?.isTwoHanded
+            ? Boolean(baseWeaponConfig.disableTwoHandedDamageMultiplier)
+            : false,
         extraDamageDiceCount: Math.max(
           0,
           baseWeaponConfig.extraDamageDiceCount ?? 0,
@@ -1214,6 +1226,7 @@ export function BattleActionModal({
                             source: "equipped",
                             selectedWeaponId: weapon?.id,
                             useCustomWeaponProfile: false,
+                            disableTwoHandedDamageMultiplier: false,
                             weaponSnapshot: weapon
                               ? getWeaponSnapshot(weapon)
                               : currentConfig.weaponSnapshot,
@@ -1225,6 +1238,7 @@ export function BattleActionModal({
                           source: "improvised",
                           selectedWeaponId: undefined,
                           useCustomWeaponProfile: false,
+                          disableTwoHandedDamageMultiplier: false,
                           weaponSnapshot:
                             currentConfig.source === "equipped"
                               ? createEmptyWeaponSnapshot()
@@ -1261,6 +1275,7 @@ export function BattleActionModal({
                           return {
                             ...currentConfig,
                             selectedWeaponId: weapon.id,
+                            disableTwoHandedDamageMultiplier: false,
                             weaponSnapshot: getWeaponSnapshot(weapon),
                           };
                         })
@@ -1292,6 +1307,25 @@ export function BattleActionModal({
                     ariaLabel="Tipo de dano del arma"
                   />
                 </label>
+
+                {selectedEquippedWeaponIsTwoHanded ? (
+                  <div className="rounded-2xl border border-border/60 bg-secondary/15 p-4 md:col-span-2">
+                    <FormCheckbox
+                      checked={Boolean(
+                        currentWeaponConfig.disableTwoHandedDamageMultiplier,
+                      )}
+                      onChange={(checked) =>
+                        setWeaponConfig((currentConfig) => ({
+                          ...currentConfig,
+                          disableTwoHandedDamageMultiplier: checked,
+                        }))
+                      }
+                      ariaLabel="Desactivar el dano a dos manos para esta macro"
+                      label="Usar esta arma a una mano en esta macro"
+                      description="Si lo activas, esta accion no aplicara el multiplicador x1,5 al dano base del arma a dos manos."
+                    />
+                  </div>
+                ) : null}
               </>
             ) : null}
           </div>
@@ -1441,8 +1475,13 @@ export function BattleActionModal({
                           const damageTypeLabel = currentWeaponConfig.damageType
                             ? DAMAGE_TYPE_LABELS[currentWeaponConfig.damageType]
                             : null;
+                          const twoHandedLabel =
+                            selectedEquippedWeaponIsTwoHanded &&
+                            !currentWeaponConfig.disableTwoHandedDamageMultiplier
+                              ? " | Dano base x1,5"
+                              : "";
 
-                          return `${effectiveWeaponDiceCount}d${snapshot.damageDiceType}${damageTypeLabel ? ` | ${damageTypeLabel}` : ""} | Critico ${criticalRange}/x${snapshot.criticalMultiplier}`;
+                          return `${effectiveWeaponDiceCount}d${snapshot.damageDiceType}${damageTypeLabel ? ` | ${damageTypeLabel}` : ""}${twoHandedLabel} | Critico ${criticalRange}/x${snapshot.criticalMultiplier}`;
                         })()}
                       </div>
                     </>

@@ -368,6 +368,9 @@ function normalizeStoredAttack(
             useCustomWeaponProfile: Boolean(
               storedAttack.weaponConfig.useCustomWeaponProfile,
             ),
+            disableTwoHandedDamageMultiplier: Boolean(
+              storedAttack.weaponConfig.disableTwoHandedDamageMultiplier,
+            ),
             extraDamageDiceCount: Math.max(
               0,
               storedAttack.weaponConfig.extraDamageDiceCount ?? 0,
@@ -779,6 +782,7 @@ export function CharacterId() {
         totalModifiers?: RollModifier[];
         perDieModifiers?: RollModifier[];
         baseMultiplier?: number;
+        baseRollMultiplier?: number;
         damageGroups?: {
           diceCount: number;
           diceType?: number;
@@ -786,6 +790,7 @@ export function CharacterId() {
           perDieBonus?: number;
           perDieModifiers?: RollModifier[];
           baseMultiplier?: number;
+          baseRollMultiplier?: number;
         }[];
       },
     ) => {
@@ -797,6 +802,7 @@ export function CharacterId() {
         totalModifiers = [],
         perDieModifiers = [],
         baseMultiplier = 1,
+        baseRollMultiplier = 1,
         damageGroups,
       } = damageConfig;
       const resolvedTotalModifiers =
@@ -830,6 +836,7 @@ export function CharacterId() {
                         },
                       ]
                     : [],
+              baseRollMultiplier: Math.max(1, group.baseRollMultiplier ?? 1),
               baseMultiplier: Math.max(1, group.baseMultiplier ?? 1),
             }))
           : [
@@ -839,9 +846,16 @@ export function CharacterId() {
                 damageType: undefined,
                 perDieBonus: 0,
                 perDieModifiers: [],
+                baseRollMultiplier: Math.max(1, baseRollMultiplier),
                 baseMultiplier: Math.max(1, baseMultiplier),
               },
             ];
+
+      const getRoundedBaseDamage = (
+        rollTotal: number,
+        rollMultiplier: number,
+        criticalMultiplier: number,
+      ) => Math.floor(rollTotal * rollMultiplier * criticalMultiplier);
 
       const groupedBaseRolls = resolvedDamageGroups.map((group) =>
         Array.from(
@@ -866,7 +880,39 @@ export function CharacterId() {
             0,
           );
 
-          return extraTotal + groupTotal * (group.baseMultiplier - 1);
+          const baseDamageWithoutCritical = getRoundedBaseDamage(
+            groupTotal,
+            group.baseRollMultiplier,
+            1,
+          );
+          const baseDamageWithCritical = getRoundedBaseDamage(
+            groupTotal,
+            group.baseRollMultiplier,
+            group.baseMultiplier,
+          );
+
+          return (
+            extraTotal + (baseDamageWithCritical - baseDamageWithoutCritical)
+          );
+        },
+        0,
+      );
+      const twoHandedExtra = resolvedDamageGroups.reduce(
+        (extraTotal, group, index) => {
+          if (group.baseRollMultiplier <= 1) {
+            return extraTotal;
+          }
+
+          const groupTotal = groupedBaseRolls[index].reduce(
+            (sum, roll) => sum + roll,
+            0,
+          );
+
+          return (
+            extraTotal +
+            (getRoundedBaseDamage(groupTotal, group.baseRollMultiplier, 1) -
+              groupTotal)
+          );
         },
         0,
       );
@@ -878,6 +924,10 @@ export function CharacterId() {
           const resolvedGroup = resolvedDamageGroups[groupIndex];
           const groupPerDieBonus = resolvedGroup?.perDieBonus ?? 0;
           const groupPerDieModifiers = resolvedGroup?.perDieModifiers ?? [];
+          const groupBaseRollMultiplier = Math.max(
+            1,
+            resolvedGroup?.baseRollMultiplier ?? 1,
+          );
           const groupMultiplier = Math.max(
             1,
             resolvedGroup?.baseMultiplier ?? 1,
@@ -889,6 +939,7 @@ export function CharacterId() {
             groupIndex,
             groupPerDieBonus,
             groupPerDieModifiers,
+            groupBaseRollMultiplier,
             groupMultiplier,
           }));
         },
@@ -897,6 +948,10 @@ export function CharacterId() {
         (groupRolls, groupIndex) => {
           const groupPerDieBonus =
             resolvedDamageGroups[groupIndex]?.perDieBonus ?? 0;
+          const baseRollMultiplier = Math.max(
+            1,
+            resolvedDamageGroups[groupIndex]?.baseRollMultiplier ?? 1,
+          );
           const groupMultiplier = Math.max(
             1,
             resolvedDamageGroups[groupIndex]?.baseMultiplier ?? 1,
@@ -905,7 +960,10 @@ export function CharacterId() {
           const chipLabel = `d${resolvedDamageGroups[groupIndex]?.diceType ?? diceType}`;
 
           return groupRolls.map((roll) => ({
-            value: roll * groupMultiplier + perDieBonus + groupPerDieBonus,
+            value:
+              Math.floor(roll * baseRollMultiplier * groupMultiplier) +
+              perDieBonus +
+              groupPerDieBonus,
             label: chipLabel,
             tone: isCriticalGroup
               ? ("critical" as const)
@@ -939,9 +997,15 @@ export function CharacterId() {
       const criticalLabel = isUniformCritical
         ? `Critico x${criticalGroups[0]?.baseMultiplier ?? 2}`
         : "Critico parcial";
+      const hasTwoHandedGroups = resolvedDamageGroups.some(
+        (group) => group.baseRollMultiplier > 1,
+      );
+      const twoHandedLabel = hasTwoHandedGroups
+        ? `2 manos x${resolvedDamageGroups[0]?.baseRollMultiplier ?? 1.5}`
+        : null;
 
       setRollLabel(
-        `${attackName} Dano (${expression}${hasCriticalGroups ? `, ${isUniformCritical ? `crit x${criticalGroups[0]?.baseMultiplier ?? 2}` : "crit parcial"}` : ""})`,
+        `${attackName} Dano (${expression}${twoHandedLabel ? `, ${twoHandedLabel}` : ""}${hasCriticalGroups ? `, ${isUniformCritical ? `crit x${criticalGroups[0]?.baseMultiplier ?? 2}` : "crit parcial"}` : ""})`,
       );
 
       const modifiers = [
@@ -955,6 +1019,14 @@ export function CharacterId() {
               },
             ]
           : []),
+        ...(twoHandedExtra !== 0
+          ? [
+              {
+                label: twoHandedLabel ?? "Arma a dos manos",
+                value: twoHandedExtra,
+              },
+            ]
+          : []),
         ...(criticalExtra !== 0
           ? [{ label: criticalLabel, value: criticalExtra }]
           : []),
@@ -963,12 +1035,29 @@ export function CharacterId() {
         ...resolvedTotalModifiers,
       ];
       const perRollModifierBreakdowns = flatRollDetails.map((rollDetail) => {
+        const baseDamageWithoutCritical = Math.floor(
+          rollDetail.roll * rollDetail.groupBaseRollMultiplier,
+        );
+        const baseDamageWithCritical = Math.floor(
+          rollDetail.roll *
+            rollDetail.groupBaseRollMultiplier *
+            rollDetail.groupMultiplier,
+        );
+
         return [
+          ...(rollDetail.groupBaseRollMultiplier > 1
+            ? [
+                {
+                  label: `2 manos x${rollDetail.groupBaseRollMultiplier}`,
+                  value: baseDamageWithoutCritical - rollDetail.roll,
+                },
+              ]
+            : []),
           ...(rollDetail.groupMultiplier > 1
             ? [
                 {
                   label: `Critico x${rollDetail.groupMultiplier}`,
-                  value: rollDetail.roll * (rollDetail.groupMultiplier - 1),
+                  value: baseDamageWithCritical - baseDamageWithoutCritical,
                 },
               ]
             : []),

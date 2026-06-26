@@ -44,6 +44,7 @@ interface AttacksProps {
       totalModifiers?: { label: string; value: number }[];
       perDieModifiers?: { label: string; value: number }[];
       baseMultiplier?: number;
+      baseRollMultiplier?: number;
       damageGroups?: {
         diceCount: number;
         diceType?: number;
@@ -51,6 +52,7 @@ interface AttacksProps {
         perDieBonus?: number;
         perDieModifiers?: { label: string; value: number }[];
         baseMultiplier?: number;
+        baseRollMultiplier?: number;
       }[];
     },
   ) => void;
@@ -570,6 +572,43 @@ export function Attacks({
   const getWeaponAttackCount = (attack: Attack) =>
     getWeaponAttackBonusTotals(attack).length;
 
+  const isTwoHandedEquippedWeapon = (attack: Attack) => {
+    const config = attack.weaponConfig;
+
+    if (!config || config.source !== "equipped" || !config.selectedWeaponId) {
+      return false;
+    }
+
+    return Boolean(
+      character.equippedItems.find(
+        (item) =>
+          item.id === config.selectedWeaponId &&
+          isEquippedWeaponCandidate(item) &&
+          item.isTwoHanded,
+      ),
+    );
+  };
+
+  const getWeaponDamageRollMultiplier = (attack: Attack) => {
+    const config = attack.weaponConfig;
+
+    if (
+      !config ||
+      config.source !== "equipped" ||
+      !config.selectedWeaponId ||
+      config.disableTwoHandedDamageMultiplier
+    ) {
+      return 1;
+    }
+
+    const equippedWeapon = character.equippedItems.find(
+      (item) =>
+        item.id === config.selectedWeaponId && isEquippedWeaponCandidate(item),
+    );
+
+    return equippedWeapon?.isTwoHanded ? 1.5 : 1;
+  };
+
   const getWeaponAttackBonusTotals = (attack: Attack) => {
     const attackBonusModifierTotal = summarizeModifiers(
       attack.weaponConfig?.attackModifiers ?? [],
@@ -628,12 +667,17 @@ export function Attacks({
 
   const getWeaponBaseExpression = (attack: Attack) => {
     const snapshot = resolveWeaponSnapshot(attack);
+    const damageRollMultiplier = getWeaponDamageRollMultiplier(attack);
 
     if (!snapshot) {
       return "1d6";
     }
 
-    return `${getEffectiveWeaponDiceCount(attack)}d${snapshot.damageDiceType}`;
+    const baseExpression = `${getEffectiveWeaponDiceCount(attack)}d${snapshot.damageDiceType}`;
+
+    return damageRollMultiplier > 1
+      ? `${baseExpression} x${String(damageRollMultiplier).replace(".", ",")}`
+      : baseExpression;
   };
 
   const summarizeModifiers = (
@@ -831,9 +875,20 @@ export function Attacks({
       attack.weaponConfig?.damageModifiers ?? [],
     );
     const effectiveDiceCount = getEffectiveWeaponDiceCount(attack);
+    const damageRollMultiplier = getWeaponDamageRollMultiplier(attack);
 
     if (!snapshot) {
       return "1d6";
+    }
+
+    if (damageRollMultiplier > 1) {
+      const baseExpression = `${effectiveDiceCount}d${snapshot.damageDiceType} x${String(damageRollMultiplier).replace(".", ",")}`;
+      const totalModifier =
+        damageBonuses.total + damageBonuses.perDie * effectiveDiceCount;
+
+      return totalModifier === 0
+        ? baseExpression
+        : `${baseExpression}${totalModifier > 0 ? ` + ${totalModifier}` : ` - ${Math.abs(totalModifier)}`}`;
     }
 
     return buildRollExpression(
@@ -848,6 +903,7 @@ export function Attacks({
     criticalAttackIndexes: number[] = [],
   ) => {
     const snapshot = resolveWeaponSnapshot(attack);
+    const damageRollMultiplier = getWeaponDamageRollMultiplier(attack);
     const damageModifierDetails = getResolvedDamageModifierDetails(
       attack.weaponConfig?.damageModifiers ?? [],
     );
@@ -869,6 +925,7 @@ export function Attacks({
         { length: weaponAttackCount },
         (_, attackIndex) => ({
           diceCount: diceCountPerAttack,
+          baseRollMultiplier: damageRollMultiplier,
           baseMultiplier: criticalAttackIndexSet.has(attackIndex)
             ? Math.max(1, snapshot?.criticalMultiplier ?? 1)
             : 1,
@@ -1222,6 +1279,17 @@ export function Attacks({
                           </span>{" "}
                           {getWeaponBaseExpression(attack)}
                         </div>
+                        {isTwoHandedEquippedWeapon(attack) ? (
+                          <div>
+                            <span className="text-[rgb(244,120,120)]/90">
+                              Empunadura
+                            </span>{" "}
+                            {attack.weaponConfig
+                              ?.disableTwoHandedDamageMultiplier
+                              ? "A una mano en esta macro"
+                              : "Arma a dos manos x1,5 al dano base"}
+                          </div>
+                        ) : null}
                         <div>
                           <span className="text-[rgb(244,120,120)]/90">
                             Total

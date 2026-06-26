@@ -202,6 +202,7 @@ export interface WeaponAttackConfig {
   damageType?: DamageType;
   isFullAttack?: boolean;
   useCustomWeaponProfile?: boolean;
+  disableTwoHandedDamageMultiplier?: boolean;
   extraDamageDiceCount?: number;
   attackModifiers: BattleActionModifier[];
   damageModifiers: BattleActionModifier[];
