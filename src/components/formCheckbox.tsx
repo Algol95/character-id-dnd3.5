@@ -54,7 +54,8 @@ export function FormCheckbox({
 
       <span
         className={cn(
-          "flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-border/80 bg-input/90 text-transparent shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition-all duration-200 group-hover:border-gold/30 peer-checked:border-gold/60 peer-checked:bg-gold/15 peer-checked:text-gold peer-checked:shadow-[0_0_12px_rgba(212,175,55,0.18)] peer-focus-visible:ring-2 peer-focus-visible:ring-gold/60 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-background peer-disabled:border-border/45 peer-disabled:bg-input/45 peer-disabled:text-gold/40",
+          "flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-border/80 bg-input/90 text-transparent shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition-all duration-200 group-hover:border-gold/30 peer-checked:border-gold/60 peer-checked:bg-gold/15 peer-checked:text-gold peer-checked:shadow-[0_0_12px_rgba(212,175,55,0.18)] peer-focus-visible:ring-2 peer-focus-visible:ring-gold/60 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-background peer-disabled:border-border/45 peer-disabled:bg-input/45",
+          disabled && checked ? "text-gold/40" : "text-transparent",
           boxClassName,
         )}
       >

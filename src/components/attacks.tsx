@@ -584,6 +584,7 @@ export function Attacks({
         (item) =>
           item.id === config.selectedWeaponId &&
           isEquippedWeaponCandidate(item) &&
+          item.slot !== "ranged" &&
           item.isTwoHanded,
       ),
     );
@@ -606,7 +607,9 @@ export function Attacks({
         item.id === config.selectedWeaponId && isEquippedWeaponCandidate(item),
     );
 
-    return equippedWeapon?.isTwoHanded ? 1.5 : 1;
+    return equippedWeapon?.isTwoHanded && equippedWeapon.slot !== "ranged"
+      ? 1.5
+      : 1;
   };
 
   const getWeaponAttackBonusTotals = (attack: Attack) => {
