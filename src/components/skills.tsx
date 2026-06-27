@@ -43,7 +43,7 @@ const ABILITY_KEYS: Record<string, AbilityScoreField> = {
 };
 
 const UNTRAINED_SKILL_NAMES = new Set([
-  "Artesania",
+  "Arte",
   "Averiguar intenciones",
   "Avistar",
   "Buscar",
@@ -59,6 +59,7 @@ const UNTRAINED_SKILL_NAMES = new Set([
   "Interpretacion",
   "Intimidar",
   "Montar",
+  "Moverse sigilosamente",
   "Nadar",
   "Reunir informacion",
   "Saltar",
