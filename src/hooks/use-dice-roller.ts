@@ -6,6 +6,14 @@ export interface DiceModifier {
 }
 
 export type DiceRollMode = "normal" | "advantage" | "disadvantage";
+export type DiceRollOutcomeTone = "critical" | "fumble";
+
+export interface DiceRollSpecialOutcome {
+  tone: DiceRollOutcomeTone;
+  message: string;
+  triggerOnRollAtMost?: number;
+  triggerOnRollAtLeast?: number;
+}
 
 export interface DiceRollOptions {
   mode?: DiceRollMode;
@@ -22,6 +30,7 @@ export interface DiceRollOptions {
   criticalThreatRangeStart?: number;
   actionId?: string;
   perRollModifierBreakdowns?: DiceModifier[][];
+  specialOutcome?: DiceRollSpecialOutcome;
 }
 
 export interface DiceRollResult {
@@ -45,6 +54,8 @@ export interface DiceRollResult {
   modifierBreakdown: DiceModifier[];
   isCritical: boolean;
   isFumble: boolean;
+  specialOutcomeTone?: DiceRollOutcomeTone;
+  specialOutcomeMessage?: string;
 }
 
 export function useDiceRoller() {
@@ -110,6 +121,19 @@ export function useDiceRoller() {
           (sum, modifier) => sum + modifier.value,
           0,
         );
+        const specialOutcome = options.specialOutcome;
+        const meetsAtMostTrigger =
+          typeof specialOutcome?.triggerOnRollAtMost === "number"
+            ? roll <= specialOutcome.triggerOnRollAtMost
+            : true;
+        const meetsAtLeastTrigger =
+          typeof specialOutcome?.triggerOnRollAtLeast === "number"
+            ? roll >= specialOutcome.triggerOnRollAtLeast
+            : true;
+        const resolvedSpecialOutcome =
+          specialOutcome && meetsAtMostTrigger && meetsAtLeastTrigger
+            ? specialOutcome
+            : undefined;
         rollInstanceRef.current += 1;
 
         setResult({
@@ -158,6 +182,8 @@ export function useDiceRoller() {
           modifierBreakdown: modifiers,
           isCritical: highlightOutcome && diceType > 1 && roll === diceType,
           isFumble: highlightOutcome && diceType > 1 && roll === 1,
+          specialOutcomeTone: resolvedSpecialOutcome?.tone,
+          specialOutcomeMessage: resolvedSpecialOutcome?.message,
         });
         setIsRolling(false);
       }, 900);

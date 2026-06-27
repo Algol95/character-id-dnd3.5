@@ -13,6 +13,7 @@ import { AbilityScores } from "./abilityScores";
 import { SavingThrows } from "./savingThrows";
 import { Attacks } from "./attacks";
 import { Skills } from "./skills";
+import { Spells } from "./spells.tsx";
 import { EquippedGear } from "./equippedGear";
 import { Equipment } from "./equipment";
 import { Feats } from "./feats";
@@ -21,12 +22,16 @@ import { Header } from "./header";
 import { Footer } from "./footer";
 import {
   DEFAULT_CHARACTER,
+  createDefaultSpellLevel,
   type CarryingCapacity,
+  type DailySpellEntry,
   getSpellDamageGroups,
   type Attack,
   type CharacterData,
   type EquippedItem,
   type InventoryItem,
+  type SpellLevelData,
+  type SpellcastingData,
   type WeaponProfile,
 } from "@/lib/character-types";
 import { computeEquipmentBonuses } from "@/lib/equipment-effects";
@@ -47,6 +52,7 @@ type SectionKey =
   | "equipment"
   | "dice"
   | "skills"
+  | "spells"
   | "feats";
 
 const DEFAULT_SECTION_VISIBILITY: Record<SectionKey, boolean> = {
@@ -58,6 +64,7 @@ const DEFAULT_SECTION_VISIBILITY: Record<SectionKey, boolean> = {
   equipment: true,
   dice: true,
   skills: true,
+  spells: true,
   feats: true,
 };
 
@@ -78,6 +85,9 @@ interface PanelSectionProps {
 type StoredEquippedItem = EquippedItem & Partial<WeaponProfile>;
 type StoredInventoryItem = Partial<InventoryItem>;
 type StoredCarryingCapacity = Partial<CarryingCapacity>;
+type StoredDailySpellEntry = Partial<DailySpellEntry>;
+type StoredSpellLevelData = Partial<SpellLevelData>;
+type StoredSpellcastingData = Partial<SpellcastingData>;
 
 const OFFICIAL_DAMAGE_DICE_TYPES = new Set([4, 6, 8, 10, 12]);
 
@@ -223,6 +233,99 @@ function normalizeStoredCarryingCapacity(
       Number.isFinite(carryingCapacity.pushOrDrag)
         ? Math.max(0, Math.trunc(carryingCapacity.pushOrDrag))
         : DEFAULT_CHARACTER.carryingCapacity.pushOrDrag,
+  };
+}
+
+function normalizeStoredDailySpellEntry(
+  entry: StoredDailySpellEntry,
+): DailySpellEntry {
+  const totalUses =
+    typeof entry.totalUses === "number" && Number.isFinite(entry.totalUses)
+      ? Math.max(0, Math.trunc(entry.totalUses))
+      : 0;
+
+  const remainingUses =
+    typeof entry.remainingUses === "number" &&
+    Number.isFinite(entry.remainingUses)
+      ? Math.max(0, Math.min(totalUses, Math.trunc(entry.remainingUses)))
+      : totalUses;
+
+  return {
+    id:
+      typeof entry.id === "string" && entry.id.trim().length > 0
+        ? entry.id
+        : createBattleActionId("daily-spell"),
+    name: typeof entry.name === "string" ? entry.name : "",
+    totalUses,
+    remainingUses,
+  };
+}
+
+function normalizeStoredSpellLevel(
+  spellLevel: StoredSpellLevelData | null | undefined,
+  level: number,
+): SpellLevelData {
+  const defaultSpellLevel = createDefaultSpellLevel(level);
+
+  return {
+    level,
+    knownSpells:
+      typeof spellLevel?.knownSpells === "number" &&
+      Number.isFinite(spellLevel.knownSpells)
+        ? Math.max(0, Math.trunc(spellLevel.knownSpells))
+        : defaultSpellLevel.knownSpells,
+    saveDC:
+      typeof spellLevel?.saveDC === "number" &&
+      Number.isFinite(spellLevel.saveDC)
+        ? Math.max(0, Math.trunc(spellLevel.saveDC))
+        : defaultSpellLevel.saveDC,
+    dailySpells:
+      typeof spellLevel?.dailySpells === "number" &&
+      Number.isFinite(spellLevel.dailySpells)
+        ? Math.max(0, Math.trunc(spellLevel.dailySpells))
+        : defaultSpellLevel.dailySpells,
+    additionalSpells:
+      typeof spellLevel?.additionalSpells === "number" &&
+      Number.isFinite(spellLevel.additionalSpells)
+        ? Math.max(0, Math.trunc(spellLevel.additionalSpells))
+        : defaultSpellLevel.additionalSpells,
+    dailyEntries: Array.isArray(spellLevel?.dailyEntries)
+      ? spellLevel.dailyEntries.map(normalizeStoredDailySpellEntry)
+      : defaultSpellLevel.dailyEntries,
+  };
+}
+
+function normalizeStoredSpellcasting(
+  spellcasting:
+    | CharacterData["spellcasting"]
+    | StoredSpellcastingData
+    | null
+    | undefined,
+): SpellcastingData {
+  return {
+    specializations:
+      typeof spellcasting?.specializations === "string"
+        ? spellcasting.specializations
+        : DEFAULT_CHARACTER.spellcasting.specializations,
+    conditionalModifiers:
+      typeof spellcasting?.conditionalModifiers === "string"
+        ? spellcasting.conditionalModifiers
+        : DEFAULT_CHARACTER.spellcasting.conditionalModifiers,
+    arcaneFailureChance:
+      typeof spellcasting?.arcaneFailureChance === "number" &&
+      Number.isFinite(spellcasting.arcaneFailureChance)
+        ? Math.max(
+            0,
+            Math.min(100, Math.trunc(spellcasting.arcaneFailureChance)),
+          )
+        : DEFAULT_CHARACTER.spellcasting.arcaneFailureChance,
+    spellLevels: Array.from({ length: 10 }, (_, level) => {
+      const storedLevel = Array.isArray(spellcasting?.spellLevels)
+        ? spellcasting.spellLevels.find((entry) => entry?.level === level)
+        : null;
+
+      return normalizeStoredSpellLevel(storedLevel, level);
+    }),
   };
 }
 
@@ -443,6 +546,7 @@ function sanitizeCharacterData(character: CharacterData): CharacterData {
     carryingCapacity: normalizeStoredCarryingCapacity(
       character.carryingCapacity,
     ),
+    spellcasting: normalizeStoredSpellcasting(character.spellcasting),
   };
 }
 /**
@@ -558,6 +662,25 @@ export function CharacterId() {
     ) => {
       setRollLabel(label);
       rollDice(diceType, modifiers, { mode });
+    },
+    [rollDice],
+  );
+
+  const handleArcaneFailureRoll = useCallback(
+    (failureChance: number) => {
+      const safeChance = Math.max(0, Math.min(100, Math.trunc(failureChance)));
+
+      setRollLabel(`Fallo de conjuro arcano (falla con ${safeChance} o menos)`);
+      rollDice(100, [], {
+        specialOutcome:
+          safeChance > 0
+            ? {
+                tone: "fumble",
+                message: "FALLO ARCANO",
+                triggerOnRollAtMost: safeChance,
+              }
+            : undefined,
+      });
     },
     [rollDice],
   );
@@ -1202,7 +1325,7 @@ export function CharacterId() {
 
               <PanelSection
                 eyebrow="Apoyo de partida"
-                title="Tiradas, inventario, habilidades y dotes"
+                title="Tiradas, conjuros, inventario, habilidades y dotes"
                 caption="Utilidades de sesion"
                 sticky
               >
@@ -1219,6 +1342,14 @@ export function CharacterId() {
                   onRollSkill={handleNamedRollSimple}
                   isOpen={visibleSections.skills}
                   onToggle={() => toggleSection("skills")}
+                />
+
+                <Spells
+                  character={character}
+                  onChange={handleChange}
+                  onRollArcaneFailure={handleArcaneFailureRoll}
+                  isOpen={visibleSections.spells}
+                  onToggle={() => toggleSection("spells")}
                 />
 
                 <Feats

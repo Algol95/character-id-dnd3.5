@@ -75,14 +75,21 @@ function rollDie(sides: number) {
 function hasCriticalOutcome(result: DiceRollResult | null) {
   return Boolean(
     result &&
+    result.specialOutcomeTone !== "fumble" &&
     result.diceType > 1 &&
-    (result.isCritical || result.roll === result.diceType),
+    (result.specialOutcomeTone === "critical" ||
+      result.isCritical ||
+      result.roll === result.diceType),
   );
 }
 
 function hasFumbleOutcome(result: DiceRollResult | null) {
   return Boolean(
-    result && result.diceType > 1 && (result.isFumble || result.roll === 1),
+    result &&
+    result.diceType > 1 &&
+    (result.specialOutcomeTone === "fumble" ||
+      result.isFumble ||
+      result.roll === 1),
   );
 }
 
@@ -136,7 +143,9 @@ function getResultAppearance(result: DiceRollResult | null): ResultAppearance {
     return {
       diceColorClass: "text-critical animate-critical-glow",
       backdropClass: "bg-critical/20",
-      resultMessage: result.diceType === 20 ? "GOLPE CRITICO" : "TIRADA MAXIMA",
+      resultMessage:
+        result.specialOutcomeMessage ??
+        (result.diceType === 20 ? "GOLPE CRITICO" : "TIRADA MAXIMA"),
     };
   }
 
@@ -144,7 +153,7 @@ function getResultAppearance(result: DiceRollResult | null): ResultAppearance {
     return {
       diceColorClass: "text-fumble animate-fumble-shake",
       backdropClass: "bg-fumble/20",
-      resultMessage: "PIFIA",
+      resultMessage: result.specialOutcomeMessage ?? "PIFIA",
     };
   }
 
@@ -577,8 +586,7 @@ export function DiceRollModal({
           return indexes;
         }, [])
       : [];
-  const showOutcomeMessage =
-    hasCriticalOutcome(displayedResult) || hasFumbleOutcome(displayedResult);
+  const showOutcomeMessage = Boolean(appearance.resultMessage);
   const selectedRollIndexes =
     result?.selectedRollIndexes && result.selectedRollIndexes.length > 0
       ? result.selectedRollIndexes

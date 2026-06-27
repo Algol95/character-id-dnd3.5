@@ -20,6 +20,29 @@ export interface InventoryItem {
   weight: number;
 }
 
+export interface DailySpellEntry {
+  id: string;
+  name: string;
+  totalUses: number;
+  remainingUses: number;
+}
+
+export interface SpellLevelData {
+  level: number;
+  knownSpells: number;
+  saveDC: number;
+  dailySpells: number;
+  additionalSpells: number;
+  dailyEntries: DailySpellEntry[];
+}
+
+export interface SpellcastingData {
+  specializations: string;
+  conditionalModifiers: string;
+  arcaneFailureChance: number;
+  spellLevels: SpellLevelData[];
+}
+
 export interface CarryingCapacity {
   lightLoad: number;
   mediumLoad: number;
@@ -332,10 +355,33 @@ export interface CharacterData {
   money: Money;
   equipment: InventoryItem[];
   carryingCapacity: CarryingCapacity;
+  spellcasting: SpellcastingData;
   feats: string;
   languages: string;
   specialAbilities: string;
   notes: string;
+}
+
+export function createDefaultSpellLevel(level: number): SpellLevelData {
+  return {
+    level,
+    knownSpells: 0,
+    saveDC: 0,
+    dailySpells: 0,
+    additionalSpells: 0,
+    dailyEntries: [],
+  };
+}
+
+export function createDefaultSpellcasting(): SpellcastingData {
+  return {
+    specializations: "",
+    conditionalModifiers: "",
+    arcaneFailureChance: 0,
+    spellLevels: Array.from({ length: 10 }, (_, level) =>
+      createDefaultSpellLevel(level),
+    ),
+  };
 }
 
 const DEFAULT_SKILLS: Skill[] = [
@@ -622,6 +668,7 @@ export const DEFAULT_CHARACTER: CharacterData = {
     liftOffGround: 0,
     pushOrDrag: 0,
   },
+  spellcasting: createDefaultSpellcasting(),
   feats: "",
   languages: "",
   specialAbilities: "",

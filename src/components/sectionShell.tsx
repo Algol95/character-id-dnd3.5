@@ -89,13 +89,13 @@ export function SectionShell({
 
       <div
         aria-hidden={isCollapsible ? !isExpanded : undefined}
-        className={`grid transition-[grid-template-rows,opacity,margin] duration-300 ease-out ${isExpanded ? "grid-rows-[1fr] overflow-visible opacity-100" : "grid-rows-[0fr] overflow-hidden opacity-0"}`}
+        className={`min-w-0 grid transition-[grid-template-rows,opacity,margin] duration-300 ease-out ${isExpanded ? "grid-rows-[1fr] overflow-visible opacity-100" : "grid-rows-[0fr] overflow-hidden opacity-0"}`}
       >
         <div
-          className={`min-h-0 ${isExpanded ? "overflow-visible" : "overflow-hidden"}`}
+          className={`min-h-0 min-w-0 ${isExpanded ? "overflow-visible" : "overflow-hidden"}`}
         >
           <div
-            className={`transition-transform duration-300 ease-out ${isExpanded ? "translate-y-0" : "-translate-y-2"}`}
+            className={`min-w-0 transition-transform duration-300 ease-out ${isExpanded ? "translate-y-0" : "-translate-y-2"}`}
           >
             {children}
           </div>
